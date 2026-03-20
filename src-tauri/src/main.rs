@@ -6,7 +6,7 @@
 use std::process::{Command, Child};
 use std::thread;
 use std::time::Duration;
-use tauri::{Manager, Window};
+use tauri::Manager;
 use tokio::net::TcpListener;
 
 static mut PYTHON_PROCESS: Option<Child> = None;
