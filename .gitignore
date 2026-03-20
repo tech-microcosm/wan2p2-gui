@@ -55,10 +55,19 @@ MANIFEST
 *.sublime-project
 *.sublime-workspace
 
-# Node modules (if using Electron/Tauri later)
+# Node modules and Tauri build artifacts
 node_modules/
 package-lock.json
 yarn.lock
+src-tauri/target/
+src-tauri/node_modules/
+
+# Build outputs (too large for git)
+*.AppImage
+*.deb
+*.dmg
+*.msi
+*.exe
 
 # Temporary files
 *.tmp
