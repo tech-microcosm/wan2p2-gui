@@ -1,0 +1,14 @@
+{
+  "name": "wan2p2-gui",
+  "version": "0.1.0",
+  "description": "Wan2.2 Video Generator Desktop Application",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:release": "tauri build --release"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}
