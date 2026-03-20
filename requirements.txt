@@ -1,0 +1,7 @@
+gradio>=4.16.0
+paramiko>=3.4.0
+scp>=0.14.5
+tqdm>=4.66.1
+PyInstaller>=6.3.0
+runpod>=1.7.0
+requests>=2.31.0

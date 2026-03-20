@@ -1,0 +1,76 @@
+# Configuration and credentials
+config.json
+.env
+*.pem
+*.key
+
+# Generated outputs
+outputs/
+*.mp4
+*.avi
+*.mov
+
+# Archives (development notes)
+archives/
+
+# Python environment and cache
+diffusion/
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Node modules (if using Electron/Tauri later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+
+# OS specific
+.DS_Store
+Thumbs.db
+.directory
+
+# Git
+.git/
+.gitkeep
