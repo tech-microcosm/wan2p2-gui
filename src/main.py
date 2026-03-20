@@ -1202,163 +1202,161 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                 gr.Markdown("### Create Your Video")
                 
                 with gr.Row():
-                    with gr.Column(scale=2):
+                    # LEFT COLUMN: Inputs
+                    with gr.Column(scale=1, min_width=400):
                         prompt = gr.Textbox(
                             label="Video Prompt",
-                            placeholder="Describe the video you want to generate...\n\nExample: A majestic eagle soaring over snow-capped mountains at sunset, golden light reflecting off its wings",
-                            lines=5,
+                            placeholder="Describe the video you want to generate...\n\nExample: A majestic eagle soaring over snow-capped mountains at sunset",
+                            lines=4,
                             info="Be detailed for better results"
                         )
                         
                         # Hidden checkbox for backwards compatibility (always False now)
                         enhance_prompt = gr.Checkbox(value=False, visible=False)
                         
-                        # Combined LLM prompt enhancement with auto-generate first suggestion
+                        # Combined LLM prompt enhancement (collapsed by default)
                         with gr.Accordion("✨ Enhance Prompt with LLM", open=False) as llm_accordion:
-                            gr.Markdown("**Click 'Generate Enhancement' to get an AI-enhanced version of your prompt.** Then refine further or apply directly.")
+                            gr.Markdown("**Click 'Generate Enhancement' to get an AI-enhanced version.**")
                             
                             with gr.Row():
-                                llm_enhance_btn = gr.Button("� Generate Enhancement", variant="primary", size="sm")
-                                llm_apply_btn = gr.Button("✅ Apply to Prompt", variant="secondary", size="sm")
+                                llm_enhance_btn = gr.Button("✨ Generate", variant="primary", size="sm")
+                                llm_apply_btn = gr.Button("✅ Apply", variant="secondary", size="sm")
                             
                             llm_chat_output = gr.Textbox(
                                 label="Enhanced Prompt",
-                                lines=6,
+                                lines=4,
                                 interactive=False,
-                                placeholder="Click 'Generate Enhancement' to get an AI-enhanced version..."
+                                placeholder="Click 'Generate' to enhance..."
                             )
                             
-                            gr.Markdown("---")
-                            gr.Markdown("**Want to refine further?** Enter your feedback below:")
-                            
                             llm_chat_input = gr.Textbox(
-                                label="Refinement Request",
-                                placeholder="e.g., 'Make it more cinematic' or 'Add underwater lighting effects'",
+                                label="Refine Further",
+                                placeholder="e.g., 'Make it more cinematic'",
                                 lines=2
                             )
                             
-                            llm_send_btn = gr.Button("💬 Refine Further", variant="secondary", size="sm")
+                            llm_send_btn = gr.Button("💬 Refine", variant="secondary", size="sm")
                         
-                        # Conditional file inputs for I2V and S2V models
-                        input_image = gr.File(
-                            label="📷 Reference Image (for I2V/S2V models)",
-                            file_types=["image"],
-                            visible=False,
-                            file_count="single"
+                        gr.Markdown("---")
+                        gr.Markdown("**Settings**")
+                        
+                        # Settings in 2-column 3-row grid
+                        with gr.Row():
+                            model = gr.Dropdown(
+                                choices=get_model_choices(),
+                                value='ti2v-5b',
+                                label="Model",
+                                scale=1
+                            )
+                            duration = gr.Dropdown(
+                                choices=[
+                                    ('2 sec (no interpolation)', 2),
+                                    ('5 sec (with RIFE interpolation)', 5),
+                                    ('10 sec (2x5s stitched)', 10)
+                                ],
+                                value=5,
+                                label="Duration",
+                                scale=1
+                            )
+                        
+                        with gr.Row():
+                            resolution = gr.Dropdown(
+                                choices=get_resolution_choices(),
+                                value='704x1280 (Portrait)',
+                                label="Resolution",
+                                scale=1
+                            )
+                            rife_multiplier = gr.Dropdown(
+                                choices=[
+                                    ('2x interpolation (faster)', 2),
+                                    ('4x interpolation (best)', 4)
+                                ],
+                                value=2,
+                                label="RIFE Interpolation",
+                                visible=True,
+                                scale=1
+                            )
+                        
+                        with gr.Row():
+                            seed = gr.Number(
+                                label="Random Seed",
+                                value=42,
+                                precision=0,
+                                scale=1
+                            )
+                            sample_steps = gr.Dropdown(
+                                choices=[
+                                    ('8 steps (fast)', 8),
+                                    ('12 steps (balanced)', 12),
+                                    ('16 steps (good)', 16),
+                                    ('20 steps (best)', 20)
+                                ],
+                                value=20,
+                                label="Sample Steps",
+                                scale=1
+                            )
+                        
+                        # File inputs in 2-column layout under settings
+                        with gr.Row():
+                            input_image = gr.File(
+                                label="📷 Reference Image",
+                                file_types=["image"],
+                                file_count="single",
+                                scale=1
+                            )
+                            input_audio = gr.File(
+                                label="🎵 Audio File",
+                                file_types=["audio"],
+                                file_count="single",
+                                scale=1
+                            )
+                        
+                        # Hidden elements for backwards compatibility
+                        enable_tiling = gr.Checkbox(
+                            label="Enable Tiling (Not Supported)",
+                            value=False,
+                            visible=False
                         )
-                        input_audio = gr.File(
-                            label="🎵 Audio File (for S2V only)",
-                            file_types=["audio"],
-                            visible=False,
-                            file_count="single"
+                        save_last_frame = gr.Checkbox(
+                            label="Save Last Frame as Image",
+                            value=False,
+                            visible=False
+                        )
+                        time_estimate = gr.Markdown("", visible=False)
+                        
+                        with gr.Row():
+                            generate_btn = gr.Button(
+                                "🚀 Generate",
+                                variant="primary",
+                                size="lg",
+                                scale=2
+                            )
+                            clear_btn = gr.Button("🔄 Clear", variant="secondary", scale=1)
+                        
+                        save_last_frame_checkbox = gr.Checkbox(
+                            label="Save Last Frame",
+                            value=False,
+                            info="Saves the final frame as an image for use with I2V model"
                         )
                     
-                    with gr.Column(scale=1):
-                        gr.Markdown("### Settings")
+                    # RIGHT COLUMN: Output
+                    with gr.Column(scale=1, min_width=400):
+                        gr.Markdown("**Output**")
                         
-                        duration = gr.Dropdown(
-                            choices=[
-                                ('2 sec (no interpolation)', 2),
-                                ('5 sec (with RIFE interpolation)', 5),
-                                ('10 sec (2x5s stitched)', 10)
-                            ],
-                            value=5,
-                            label="Duration",
-                            info="Select video length"
+                        output_video = gr.Video(
+                            label="Generated Video",
+                            interactive=False,
+                            elem_classes=["video-output"],
+                            scale=1
                         )
                         
-                        rife_multiplier = gr.Dropdown(
-                            choices=[
-                                ('2x interpolation (faster, good quality)', 2),
-                                ('4x interpolation (slower, best quality)', 4)
-                            ],
-                            value=2,
-                            label="RIFE Interpolation",
-                            info="Only applies to 5s and 10s videos",
-                            visible=True
+                        generation_status = gr.Textbox(
+                            label="Status",
+                            interactive=False,
+                            lines=8,
+                            elem_classes=["status-box"],
+                            max_lines=8
                         )
-                        
-                        model = gr.Dropdown(
-                            choices=get_model_choices(),
-                            value='ti2v-5b',
-                            label="Model",
-                            info="Select based on your GPU VRAM"
-                        )
-                        
-                        resolution = gr.Dropdown(
-                            choices=get_resolution_choices(),
-                            value='704x1280 (Portrait)',
-                            label="Resolution",
-                            info="Model-specific supported resolutions"
-                        )
-                        
-                        seed = gr.Number(
-                            label="Random Seed",
-                            value=42,
-                            precision=0,
-                            info="Same seed = reproducible results"
-                        )
-                        
-                        time_estimate = gr.Markdown("⏱️ Estimated time: ~5 minutes")
-                
-                # Speed & Advanced Settings (collapsible)
-                with gr.Accordion("⚡ Speed & Quality Settings", open=False):
-                    gr.Markdown("""
-**Speed Tips:**
-- Fewer steps = faster but lower quality
-- 20 steps: Best quality (default)
-- 12 steps: Good balance (~2x faster)
-- 8 steps: Fast preview (~2.5x faster)
-
-**Note:** Model offloading is automatically disabled for optimal performance on high-VRAM GPUs.
-                    """)
-                    
-                    sample_steps = gr.Dropdown(
-                        choices=[
-                            ('8 steps (fast preview)', 8),
-                            ('12 steps (balanced)', 12),
-                            ('16 steps (good quality)', 16),
-                            ('20 steps (best quality)', 20)
-                        ],
-                        value=20,
-                        label="Sample Steps",
-                        info="Fewer steps = faster generation"
-                    )
-                    
-                    enable_tiling = gr.Checkbox(
-                        label="Enable Tiling (Not Supported)",
-                        value=False,
-                        visible=False,
-                        info="Not available in standard Wan2.2"
-                    )
-                    
-                    save_last_frame = gr.Checkbox(
-                        label="Save Last Frame as Image",
-                        value=False,
-                        info="Useful for video continuation with I2V model"
-                    )
-                
-                with gr.Row():
-                    generate_btn = gr.Button(
-                        "🚀 Generate Video",
-                        variant="primary",
-                        size="lg",
-                        scale=2
-                    )
-                    clear_btn = gr.Button("🔄 Clear", variant="secondary", scale=1)
-                
-                generation_status = gr.Textbox(
-                    label="Generation Status",
-                    interactive=False,
-                    lines=10,
-                    elem_classes=["status-box"]
-                )
-                
-                output_video = gr.Video(
-                    label="Generated Video",
-                    interactive=False,
-                    elem_classes=["video-output"]
-                )
                 
                 # Event handlers - update resolution choices when model changes
                 def update_resolution_for_model(model_key):
@@ -1389,17 +1387,13 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                     outputs=[rife_multiplier]
                 )
                 
-                # Update file inputs visibility based on model (using queue to avoid Gradio hang)
+                # Update duration choices based on model (file inputs are always visible now)
                 def update_model_inputs(model_key):
-                    """Update UI elements based on selected model."""
+                    """Update duration choices based on selected model."""
                     from .gpu_manager import GPUManager
                     model_info = GPUManager.MODELS.get(model_key, {})
                     
-                    requires_image = model_info.get('requires_image', False)
-                    requires_audio = model_info.get('requires_audio', False)
                     supports_10s = model_info.get('speed_10s') is not None
-                    
-                    print(f"[DEBUG] Model: {model_key}, requires_image: {requires_image}, requires_audio: {requires_audio}")
                     
                     # Duration choices based on model
                     if supports_10s:
@@ -1414,22 +1408,17 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                             ('5 sec (with RIFE interpolation)', 5),
                         ]
                     
-                    # Return updates - will be queued to avoid Gradio bug
-                    return (
-                        gr.File(visible=requires_image, interactive=requires_image),
-                        gr.File(visible=requires_audio, interactive=requires_audio),
-                        gr.update(choices=duration_choices, value=5)
-                    )
+                    return gr.update(choices=duration_choices, value=5)
                 
                 model.change(
                     fn=update_model_inputs,
                     inputs=[model],
-                    outputs=[input_image, input_audio, duration]
+                    outputs=[duration]
                 )
                 
                 generate_btn.click(
                     fn=generate_video_wrapper,
-                    inputs=[prompt, duration, model, resolution, seed, enhance_prompt, rife_multiplier, sample_steps, enable_tiling, save_last_frame, input_image, input_audio],
+                    inputs=[prompt, duration, model, resolution, seed, enhance_prompt, rife_multiplier, sample_steps, enable_tiling, save_last_frame_checkbox, input_image, input_audio],
                     outputs=[output_video, generation_status]
                 )
                 
@@ -1546,8 +1535,8 @@ Browse and download your generated videos and images. Videos are automatically s
 |-------|------------|---------|----------|-------|----------|
 | **TI2V-5B** | ~3 min | Good | 24GB | Text/Image | Fast iterations, testing |
 | **T2V-A14B** | ~6-7 min | Excellent | 40GB | Text only | High-quality text-to-video |
-| **I2V-A14B** | ~8-10 min | Excellent | 40GB | Image+Text | Animate reference images |
-| **S2V-14B** | ~10-12 min | Excellent | 60GB+ | Image+Audio | Talking head videos |
+| **I2V-A14B** | ~8-10 min | Excellent | 60GB | Image+Text | Animate reference images |
+| **S2V-14B** | ~10-12 min | Excellent | 60GB | Image+Audio | Talking head videos |
 
 ## Recommended RunPod GPU Specs
 
@@ -1557,10 +1546,10 @@ All models tested with **RunPod PyTorch 2.8.0** template, **250GB container disk
 |-------|----------------|------|-----------|-------|
 | **TI2V-5B** | RTX 4090 / RTX A5000 | 24GB+ | ~$0.40/hr | Fastest, most affordable |
 | **T2V-A14B** | RTX 6000 Ada / A100 40GB | 40-48GB | ~$0.75/hr | Needs offloading on 40GB |
-| **I2V-A14B** | RTX 6000 Ada / A100 40GB | 40-48GB | ~$0.75/hr | Same as T2V-A14B |
-| **S2V-14B** | RTX PRO 6000 / A100 80GB | 60-96GB | ~$1.50/hr | 48GB GPU will OOM |
+| **I2V-A14B** | RTX PRO 6000 / A100 80GB | 60GB+ | ~$1.50/hr | Requires 60GB+ VRAM minimum |
+| **S2V-14B** | RTX PRO 6000 / A100 80GB | 60GB+ | ~$1.50/hr | Requires 60GB+ VRAM minimum |
 
-> **Tip:** For S2V-14B, use a GPU with **60GB+ VRAM**. The RTX PRO 6000 (96GB) or A100 80GB are recommended.
+> **Important:** Both **I2V-A14B** and **S2V-14B** require **60GB+ VRAM**. The RTX PRO 6000 (96GB) or A100 80GB are recommended. 48GB GPUs will result in out-of-memory errors.
 
 ## Video Duration
 

@@ -98,7 +98,8 @@ This takes approximately 10-15 minutes.
 |-------|------------|---------|----------|----------|
 | **TI2V-5B** | ~3 min | Good | 24GB | Fast iterations, testing |
 | **T2V-A14B** | ~6-7 min | Excellent | 40GB | High-quality final renders |
-| **I2V-A14B** | ~8-10 min | Excellent | 40GB | Video continuation |
+| **I2V-A14B** | ~8-10 min | Excellent | 60GB | Video continuation |
+| **S2V-14B** | ~8-10 min | Excellent | 60GB | Audio-driven video generation |
 
 ### Model Selection by GPU
 
@@ -106,7 +107,8 @@ This takes approximately 10-15 minutes.
 |----------|------------------|-------------|
 | 24GB | TI2V-5B only | TI2V-5B |
 | 40GB | TI2V-5B, T2V-A14B (480P) | T2V-A14B |
-| 80GB+ | All models, all resolutions | T2V-A14B (720P) |
+| 60GB | TI2V-5B, T2V-A14B, I2V-A14B, S2V-14B (480P) | I2V-A14B or S2V-14B |
+| 80GB+ | All models, all resolutions | T2V-A14B (720P) or S2V-14B (720P) |
 
 ## Resolution Guide
 
