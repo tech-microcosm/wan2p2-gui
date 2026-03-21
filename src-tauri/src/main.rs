@@ -51,34 +51,42 @@ async fn wait_for_backend(max_attempts: u32) -> bool {
 
 /// Launch the Python backend executable
 fn launch_python_backend() -> Result<Child, String> {
-    // Determine the path to the Python executable
+    // Use tauri's sidecar helper to locate the bundled executable
     let exe_name = if cfg!(windows) {
         "wan2p2-gui.exe"
     } else {
         "wan2p2-gui"
     };
     
-    // Try to find the executable in the app resources
-    let exe_path = if cfg!(debug_assertions) {
-        // Development: look in dist directory
-        format!("./dist/wan2p2-gui/{}", exe_name)
-    } else {
-        // Production: look in the app bundle
-        #[cfg(target_os = "macos")]
-        {
-            format!("../Resources/wan2p2-gui/{}", exe_name)
+    // Try multiple paths in order of preference
+    let paths = vec![
+        // Development mode
+        format!("./dist/wan2p2-gui/{}", exe_name),
+        // Production: bundled with app
+        format!("./wan2p2-gui/{}", exe_name),
+        // macOS app bundle
+        format!("../Resources/wan2p2-gui/{}", exe_name),
+        // Windows portable
+        exe_name.to_string(),
+    ];
+    
+    let mut exe_path = String::new();
+    for path in paths {
+        if std::path::Path::new(&path).exists() {
+            exe_path = path;
+            break;
         }
-        #[cfg(not(target_os = "macos"))]
-        {
-            format!("./wan2p2-gui/{}", exe_name)
-        }
-    };
+    }
+    
+    if exe_path.is_empty() {
+        return Err("Python backend executable not found in any expected location".to_string());
+    }
     
     println!("🚀 Launching Python backend from: {}", exe_path);
     
     let child = Command::new(&exe_path)
         .spawn()
-        .map_err(|e| format!("Failed to launch Python backend: {}", e))?;
+        .map_err(|e| format!("Failed to launch Python backend at {}: {}", exe_path, e))?;
     
     println!("✅ Python backend process started (PID: {})", child.id());
     Ok(child)
