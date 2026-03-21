@@ -95,9 +95,9 @@ jobs:
 
       - name: Copy Python Backend to Tauri Resources
         run: |
-          mkdir src-tauri\resources -Force
-          Copy-Item -Path dist\wan2p2-gui -Destination src-tauri\resources\ -Recurse
+          Copy-Item -Path dist\wan2p2-gui -Destination src-tauri\resources\ -Recurse -Force
           Get-ChildItem src-tauri\resources\wan2p2-gui\
+          Write-Host "Backend copied to resources folder"
 
       - name: Install Tauri dependencies
         working-directory: src-tauri
