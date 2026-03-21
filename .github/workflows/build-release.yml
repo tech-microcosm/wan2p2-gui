@@ -121,7 +121,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            src-tauri/target/release/bundle/msi/Wan2.2 Video Generator_0.1.0_x64_en-US.msi
+            src-tauri/target/release/bundle/msi/*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
