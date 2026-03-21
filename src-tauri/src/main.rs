@@ -105,25 +105,27 @@ fn launch_python_backend() -> Result<Child, String> {
         exe_dir.join("..").join("Resources").join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
     ];
     
-    println!("🔍 [DEBUG] Searching for Python backend executable...");
-    println!("🔍 [DEBUG] Current working directory: {:?}", std::env::current_dir());
+    eprintln!("🔍 [DEBUG] Searching for Python backend executable...");
+    eprintln!("🔍 [DEBUG] Current executable: {}", current_exe_str);
+    eprintln!("🔍 [DEBUG] Executable directory: {:?}", exe_dir);
+    eprintln!("🔍 [DEBUG] Current working directory: {:?}", std::env::current_dir());
     
     let mut exe_path = String::new();
     for path in &paths {
         let exists = std::path::Path::new(&path).exists();
-        println!("🔍 [DEBUG] Checking path: {} - Exists: {}", path, exists);
+        eprintln!("🔍 [DEBUG] Checking path: {} - Exists: {}", path, exists);
         if exists {
             // Check if this is the same as the current executable to prevent recursion
             let canonical_path = std::fs::canonicalize(path).unwrap_or_default();
             let canonical_current = std::fs::canonicalize(&current_exe).unwrap_or_default();
             
             if canonical_path == canonical_current {
-                println!("⚠️  [DEBUG] Skipping {} - it's the current executable (would cause infinite loop)", path);
+                eprintln!("⚠️  [DEBUG] Skipping {} - it's the current executable (would cause infinite loop)", path);
                 continue;
             }
             
             exe_path = path.clone();
-            println!("✅ [DEBUG] Found backend at: {}", exe_path);
+            eprintln!("✅ [DEBUG] Found backend at: {}", exe_path);
             break;
         }
     }
