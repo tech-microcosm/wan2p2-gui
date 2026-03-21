@@ -40,6 +40,12 @@ jobs:
           python -m pip install -r requirements.txt
           bash build_executable.sh
 
+      - name: Copy Python Backend to Tauri Resources
+        run: |
+          mkdir -p src-tauri/resources
+          cp -r dist/wan2p2-gui src-tauri/resources/
+          ls -la src-tauri/resources/wan2p2-gui/
+
       - name: Install Tauri dependencies
         working-directory: src-tauri
         run: npm install
@@ -87,6 +93,12 @@ jobs:
           python -m pip install -r requirements.txt
           .\build_executable.bat
 
+      - name: Copy Python Backend to Tauri Resources
+        run: |
+          mkdir src-tauri\resources -Force
+          Copy-Item -Path dist\wan2p2-gui -Destination src-tauri\resources\ -Recurse
+          Get-ChildItem src-tauri\resources\wan2p2-gui\
+
       - name: Install Tauri dependencies
         working-directory: src-tauri
         run: npm install
@@ -133,6 +145,12 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           bash build_executable.sh
+
+      - name: Copy Python Backend to Tauri Resources
+        run: |
+          mkdir -p src-tauri/resources
+          cp -r dist/wan2p2-gui src-tauri/resources/
+          ls -la src-tauri/resources/wan2p2-gui/
 
       - name: Install Tauri dependencies
         working-directory: src-tauri

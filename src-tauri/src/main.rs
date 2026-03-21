@@ -51,7 +51,6 @@ async fn wait_for_backend(max_attempts: u32) -> bool {
 
 /// Launch the Python backend executable
 fn launch_python_backend() -> Result<Child, String> {
-    // Use tauri's sidecar helper to locate the bundled executable
     let exe_name = if cfg!(windows) {
         "wan2p2-gui.exe"
     } else {
@@ -60,6 +59,8 @@ fn launch_python_backend() -> Result<Child, String> {
     
     // Try multiple paths in order of preference
     let paths = vec![
+        // Production: bundled resources directory
+        format!("./resources/wan2p2-gui/{}", exe_name),
         // Development mode
         format!("./dist/wan2p2-gui/{}", exe_name),
         // Production: bundled with app
@@ -71,15 +72,16 @@ fn launch_python_backend() -> Result<Child, String> {
     ];
     
     let mut exe_path = String::new();
-    for path in paths {
+    for path in &paths {
         if std::path::Path::new(&path).exists() {
-            exe_path = path;
+            exe_path = path.clone();
             break;
         }
     }
     
     if exe_path.is_empty() {
-        return Err("Python backend executable not found in any expected location".to_string());
+        let paths_str = paths.join(", ");
+        return Err(format!("Python backend executable not found. Checked: {}", paths_str));
     }
     
     println!("🚀 Launching Python backend from: {}", exe_path);
