@@ -52,14 +52,16 @@ jobs:
 
       - name: Build Tauri App
         working-directory: src-tauri
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          NO_STRIP: true
         run: npm run build
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            src-tauri/target/release/bundle/appimage/Wan2.2 Video Generator_0.1.0_amd64.AppImage
-            src-tauri/target/release/bundle/deb/Wan2.2 Video Generator_0.1.0_amd64.deb
+            src-tauri/target/release/bundle/deb/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
@@ -96,8 +98,16 @@ jobs:
       - name: Copy Python Backend to Tauri Resources
         run: |
           Copy-Item -Path dist\wan2p2-gui -Destination src-tauri\resources\ -Recurse -Force
-          Get-ChildItem src-tauri\resources\wan2p2-gui\
           Write-Host "Backend copied to resources folder"
+          Write-Host "=== Resources structure ==="
+          Get-ChildItem -Recurse src-tauri\resources\ | Select-Object FullName
+          Write-Host "=== Verifying backend executable ==="
+          if (Test-Path src-tauri\resources\wan2p2-gui\wan2p2-gui.exe) {
+            Write-Host "Backend executable found at src-tauri\resources\wan2p2-gui\wan2p2-gui.exe"
+          } else {
+            Write-Host "ERROR: Backend executable not found!"
+            exit 1
+          }
 
       - name: Install Tauri dependencies
         working-directory: src-tauri
