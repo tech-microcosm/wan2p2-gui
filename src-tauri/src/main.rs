@@ -108,49 +108,68 @@ fn stop_python_backend() {
 }
 
 fn main() {
+    println!("===============================================");
+    println!("🚀 MAIN FUNCTION CALLED - App starting");
+    println!("===============================================");
+    
     tauri::Builder::default()
         .setup(|app| {
+            println!("🔧 [SETUP] Setup function called");
+            
             // Prevent duplicate initialization
             if APP_INITIALIZED.swap(true, Ordering::SeqCst) {
-                println!("⚠️ App already initialized, skipping setup");
+                eprintln!("⚠️ [SETUP] WARNING: App already initialized! Setup called multiple times!");
+                eprintln!("⚠️ [SETUP] This should NOT happen - indicates a bug");
                 return Ok(());
             }
             
-            println!("🚀 Starting Wan2.2 Video Generator...");
+            println!("✅ [SETUP] First initialization - proceeding");
+            
+            // Check how many windows exist
+            let window_labels: Vec<String> = app.webview_windows()
+                .iter()
+                .map(|(label, _)| label.clone())
+                .collect();
+            println!("📊 [SETUP] Current windows: {} - Labels: {:?}", window_labels.len(), window_labels);
             
             // Launch Python backend on app startup
+            println!("🐍 [SETUP] Launching Python backend...");
             match launch_python_backend() {
                 Ok(child) => {
                     if let Ok(mut process) = PYTHON_PROCESS.lock() {
                         *process = Some(child);
                     }
-                    println!("✅ Backend launched successfully");
+                    println!("✅ [SETUP] Backend launched successfully");
                 }
                 Err(e) => {
-                    eprintln!("❌ {}", e);
+                    eprintln!("❌ [SETUP] Failed to launch backend: {}", e);
                     // Don't exit - let the window show an error page
                     return Ok(());
                 }
             }
             
-            // The loading page (index.html) will automatically check for backend
-            // and redirect when ready - no JavaScript eval needed from Rust
-            println!("✅ Application setup complete - loading page will redirect when backend is ready");
+            println!("✅ [SETUP] Setup complete - loading page will handle redirect");
             
             Ok(())
         })
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { .. } => {
-                    // Stop the backend when the window is closed
-                    println!("🛑 Window close requested, stopping backend...");
+                    println!("🛑 [WINDOW EVENT] Close requested for window: {}", window.label());
                     stop_python_backend();
-                    // Let the window close normally - don't prevent it
                 }
-                _ => {}
+                tauri::WindowEvent::Focused(focused) => {
+                    println!("�️  [WINDOW EVENT] Window {} focus changed: {}", window.label(), focused);
+                }
+                _ => {
+                    // Log all other events to catch anything unusual
+                    println!("📝 [WINDOW EVENT] Window {} event: {:?}", window.label(), event);
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![get_app_version, get_backend_url])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+    
+    println!("🏁 [MAIN] App shutdown");
 }

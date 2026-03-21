@@ -59,30 +59,72 @@
         <p class="status" id="status">Please wait...</p>
     </div>
     <script>
-        // Check if backend is ready and redirect
+        console.log('[LOADING PAGE] Script started');
+        
+        // Prevent multiple redirects
+        let hasRedirected = false;
         let attempts = 0;
         const maxAttempts = 120; // 2 minutes max
         
         function checkBackend() {
+            if (hasRedirected) {
+                console.log('[LOADING PAGE] Already redirected, skipping check');
+                return;
+            }
+            
             attempts++;
+            console.log(`[LOADING PAGE] Check attempt ${attempts}/${maxAttempts}`);
             document.getElementById('status').textContent = `Connecting... (attempt ${attempts})`;
             
-            fetch('http://localhost:7860/', { mode: 'no-cors' })
-                .then(() => {
-                    // Backend is ready, redirect
-                    window.location.href = 'http://localhost:7860/';
-                })
-                .catch(() => {
-                    if (attempts < maxAttempts) {
-                        setTimeout(checkBackend, 1000);
-                    } else {
-                        document.getElementById('status').textContent = 'Backend failed to start. Please restart the application.';
-                    }
-                });
+            // Use image loading to check if server is up (works cross-origin)
+            const img = new Image();
+            const timeout = setTimeout(() => {
+                console.log(`[LOADING PAGE] Attempt ${attempts} timed out`);
+                img.src = ''; // Cancel request
+                if (attempts < maxAttempts) {
+                    setTimeout(checkBackend, 1000);
+                } else {
+                    console.error('[LOADING PAGE] Max attempts reached');
+                    document.getElementById('status').textContent = 'Backend failed to start. Please restart the application.';
+                }
+            }, 800);
+            
+            img.onload = () => {
+                clearTimeout(timeout);
+                console.log('[LOADING PAGE] Backend responded! Redirecting...');
+                hasRedirected = true;
+                document.getElementById('status').textContent = 'Connected! Loading Gradio...';
+                
+                // Delay redirect slightly to ensure flag is set
+                setTimeout(() => {
+                    console.log('[LOADING PAGE] Executing redirect to http://localhost:7860/');
+                    window.location.replace('http://localhost:7860/'); // Use replace to avoid back button issues
+                }, 500);
+            };
+            
+            img.onerror = () => {
+                clearTimeout(timeout);
+                console.log(`[LOADING PAGE] Attempt ${attempts} failed (server not ready)`);
+                if (attempts < maxAttempts) {
+                    setTimeout(checkBackend, 1000);
+                } else {
+                    console.error('[LOADING PAGE] Max attempts reached');
+                    document.getElementById('status').textContent = 'Backend failed to start. Please restart the application.';
+                }
+            };
+            
+            // Try to load favicon or any static resource
+            img.src = 'http://localhost:7860/favicon.ico?' + Date.now();
         }
         
         // Start checking after 2 seconds
+        console.log('[LOADING PAGE] Will start checking backend in 2 seconds');
         setTimeout(checkBackend, 2000);
+        
+        // Log if page is being unloaded
+        window.addEventListener('beforeunload', () => {
+            console.log('[LOADING PAGE] Page unloading');
+        });
     </script>
 </body>
 </html>
