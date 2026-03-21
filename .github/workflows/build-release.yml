@@ -6,61 +6,41 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            build_dir: src-tauri/target/release/bundle
-            artifacts: |
-              Wan2.2 Video Generator_0.1.0_amd64.AppImage
-              Wan2.2 Video Generator_0.1.0_amd64.deb
-
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            build_dir: src-tauri/target/release/bundle/msi
-            artifacts: |
-              Wan2.2 Video Generator_0.1.0_x64_en-US.msi
-
-          - os: macos-latest
-            target: universal-apple-darwin
-            build_dir: src-tauri/target/release/bundle/dmg
-            artifacts: |
-              Wan2.2 Video Generator_0.1.0_universal.dmg
-
-    runs-on: ${{ matrix.os }}
-    name: Build on ${{ matrix.os }}
+  build-linux:
+    runs-on: ubuntu-latest
+    name: Build on Linux
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src-tauri/package-lock.json
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          targets: x86_64-unknown-linux-gnu
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+          cache: 'pip'
 
       - name: Build Python Backend
         run: |
           python -m pip install -r requirements.txt
-          ./build_executable.sh
+          bash build_executable.sh
 
       - name: Install Tauri dependencies
         working-directory: src-tauri
@@ -76,7 +56,102 @@ jobs:
           files: |
             src-tauri/target/release/bundle/appimage/Wan2.2 Video Generator_0.1.0_amd64.AppImage
             src-tauri/target/release/bundle/deb/Wan2.2 Video Generator_0.1.0_amd64.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  build-windows:
+    runs-on: windows-latest
+    name: Build on Windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src-tauri/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Build Python Backend
+        run: |
+          python -m pip install -r requirements.txt
+          .\build_executable.bat
+
+      - name: Install Tauri dependencies
+        working-directory: src-tauri
+        run: npm install
+
+      - name: Build Tauri App
+        working-directory: src-tauri
+        run: npm run build
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
             src-tauri/target/release/bundle/msi/Wan2.2 Video Generator_0.1.0_x64_en-US.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  build-macos:
+    runs-on: macos-latest
+    name: Build on macOS
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src-tauri/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Build Python Backend
+        run: |
+          python -m pip install -r requirements.txt
+          bash build_executable.sh
+
+      - name: Install Tauri dependencies
+        working-directory: src-tauri
+        run: npm install
+
+      - name: Build Tauri App
+        working-directory: src-tauri
+        run: npm run build
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
             src-tauri/target/release/bundle/dmg/Wan2.2 Video Generator_0.1.0_universal.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
