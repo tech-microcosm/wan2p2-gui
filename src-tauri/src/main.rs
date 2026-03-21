@@ -10,13 +10,36 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 use tokio::net::TcpListener;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 static PYTHON_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 static APP_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
+/// Helper function to log to both stderr and a file
+fn log_to_file(msg: &str) {
+    eprintln!("{}", msg);
+    
+    // Also write to a log file in temp directory for easier debugging
+    if let Ok(temp_dir) = std::env::temp_dir().canonicalize() {
+        let log_path = temp_dir.join("wan2p2-gui-debug.log");
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+        {
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let _ = writeln!(file, "[{}] {}", timestamp, msg);
+        }
+    }
+}
+
 #[tauri::command]
 fn get_app_version() -> String {
-    "0.1.0".to_string()
+    "0.1.2".to_string()
 }
 
 #[tauri::command]
@@ -82,41 +105,41 @@ fn launch_python_backend(app: &tauri::App) -> Result<Child, String> {
         "wan2p2-gui"
     };
     
-    eprintln!("🔍 [DEBUG] Searching for Python backend executable...");
-    eprintln!("🔍 [DEBUG] Current working directory: {:?}", std::env::current_dir());
+    log_to_file("🔍 [DEBUG] Searching for Python backend executable...");
+    log_to_file(&format!("🔍 [DEBUG] Current working directory: {:?}", std::env::current_dir()));
     
     // Use Tauri's official resource path resolver
     let resource_path = format!("resources/wan2p2-gui/{}", exe_name);
-    eprintln!("🔍 [DEBUG] Resolving resource path: {}", resource_path);
+    log_to_file(&format!("🔍 [DEBUG] Resolving resource path: {}", resource_path));
     
     let backend_path = app.path()
         .resolve(&resource_path, tauri::path::BaseDirectory::Resource)
         .map_err(|e| {
             let error_msg = format!("❌ Failed to resolve resource path '{}': {}", resource_path, e);
-            eprintln!("{}", error_msg);
+            log_to_file(&error_msg);
             error_msg
         })?;
     
-    eprintln!("🔍 [DEBUG] Resolved backend path: {:?}", backend_path);
-    eprintln!("🔍 [DEBUG] Backend exists: {}", backend_path.exists());
+    log_to_file(&format!("🔍 [DEBUG] Resolved backend path: {:?}", backend_path));
+    log_to_file(&format!("🔍 [DEBUG] Backend exists: {}", backend_path.exists()));
     
     if !backend_path.exists() {
         let error_msg = format!(
             "❌ Python backend executable not found at resolved path: {:?}\n\nPlease ensure the Python backend is built and bundled correctly.",
             backend_path
         );
-        eprintln!("{}", error_msg);
+        log_to_file(&error_msg);
         return Err(error_msg);
     }
     
-    eprintln!("✅ [DEBUG] Found backend at: {:?}", backend_path);
-    eprintln!("🚀 Launching Python backend from: {:?}", backend_path);
+    log_to_file(&format!("✅ [DEBUG] Found backend at: {:?}", backend_path));
+    log_to_file(&format!("🚀 Launching Python backend from: {:?}", backend_path));
     
     let child = Command::new(&backend_path)
         .spawn()
         .map_err(|e| {
             let error_msg = format!("❌ Failed to launch Python backend at {:?}: {}\n\nPlease check:\n1. Python backend is built\n2. All dependencies are installed\n3. No antivirus blocking execution", backend_path, e);
-            eprintln!("{}", error_msg);
+            log_to_file(&error_msg);
             error_msg
         })?;
     
@@ -142,41 +165,41 @@ fn main() {
     
     tauri::Builder::default()
         .setup(|app| {
-            println!("🔧 [SETUP] Setup function called");
+            log_to_file("🔧 [SETUP] Setup function called");
             
             // Prevent duplicate initialization
             if APP_INITIALIZED.swap(true, Ordering::SeqCst) {
-                eprintln!("⚠️ [SETUP] WARNING: App already initialized! Setup called multiple times!");
-                eprintln!("⚠️ [SETUP] This should NOT happen - indicates a bug");
+                log_to_file("⚠️ [SETUP] WARNING: App already initialized! Setup called multiple times!");
+                log_to_file("⚠️ [SETUP] This should NOT happen - indicates a bug");
                 return Ok(());
             }
             
-            println!("✅ [SETUP] First initialization - proceeding");
+            log_to_file("✅ [SETUP] First initialization - proceeding");
             
             // Check how many windows exist
             let window_labels: Vec<String> = app.webview_windows()
                 .iter()
                 .map(|(label, _)| label.clone())
                 .collect();
-            println!("📊 [SETUP] Current windows: {} - Labels: {:?}", window_labels.len(), window_labels);
+            log_to_file(&format!("📊 [SETUP] Current windows: {} - Labels: {:?}", window_labels.len(), window_labels));
             
             // Launch Python backend on app startup
-            println!("🐍 [SETUP] Launching Python backend...");
+            log_to_file("🐍 [SETUP] Launching Python backend...");
             match launch_python_backend(app) {
                 Ok(child) => {
                     if let Ok(mut process) = PYTHON_PROCESS.lock() {
                         *process = Some(child);
                     }
-                    println!("✅ [SETUP] Backend launched successfully");
+                    log_to_file("✅ [SETUP] Backend launched successfully");
                 }
                 Err(e) => {
-                    eprintln!("❌ [SETUP] Failed to launch backend: {}", e);
+                    log_to_file(&format!("❌ [SETUP] Failed to launch backend: {}", e));
                     // Don't exit - let the window show an error page
                     return Ok(());
                 }
             }
             
-            println!("✅ [SETUP] Setup complete - loading page will handle redirect");
+            log_to_file("✅ [SETUP] Setup complete - loading page will handle redirect");
             
             Ok(())
         })
