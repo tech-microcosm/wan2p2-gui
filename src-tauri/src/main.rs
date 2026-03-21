@@ -135,7 +135,22 @@ fn launch_python_backend(app: &tauri::App) -> Result<Child, String> {
     log_to_file(&format!("✅ [DEBUG] Found backend at: {:?}", backend_path));
     log_to_file(&format!("🚀 Launching Python backend from: {:?}", backend_path));
     
+    // Create log files for backend stdout and stderr
+    let temp_dir = std::env::temp_dir();
+    let stdout_log = temp_dir.join("wan2p2-backend-stdout.log");
+    let stderr_log = temp_dir.join("wan2p2-backend-stderr.log");
+    
+    log_to_file(&format!("📝 [DEBUG] Backend stdout will be logged to: {:?}", stdout_log));
+    log_to_file(&format!("📝 [DEBUG] Backend stderr will be logged to: {:?}", stderr_log));
+    
+    let stdout_file = std::fs::File::create(&stdout_log)
+        .map_err(|e| format!("Failed to create stdout log: {}", e))?;
+    let stderr_file = std::fs::File::create(&stderr_log)
+        .map_err(|e| format!("Failed to create stderr log: {}", e))?;
+    
     let child = Command::new(&backend_path)
+        .stdout(std::process::Stdio::from(stdout_file))
+        .stderr(std::process::Stdio::from(stderr_file))
         .spawn()
         .map_err(|e| {
             let error_msg = format!("❌ Failed to launch Python backend at {:?}: {}\n\nPlease check:\n1. Python backend is built\n2. All dependencies are installed\n3. No antivirus blocking execution", backend_path, e);
@@ -143,7 +158,11 @@ fn launch_python_backend(app: &tauri::App) -> Result<Child, String> {
             error_msg
         })?;
     
-    println!("✅ Python backend process started (PID: {})", child.id());
+    log_to_file(&format!("✅ Python backend process started (PID: {})", child.id()));
+    log_to_file("📋 [DEBUG] Check backend logs at:");
+    log_to_file(&format!("   stdout: {:?}", stdout_log));
+    log_to_file(&format!("   stderr: {:?}", stderr_log));
+    
     Ok(child)
 }
 
