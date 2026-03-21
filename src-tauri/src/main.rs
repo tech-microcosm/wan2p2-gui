@@ -6,10 +6,11 @@
 use std::process::{Command, Child};
 use std::thread;
 use std::time::Duration;
+use std::sync::Mutex;
 use tauri::Manager;
 use tokio::net::TcpListener;
 
-static mut PYTHON_PROCESS: Option<Child> = None;
+static PYTHON_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 
 #[tauri::command]
 fn get_app_version() -> String {
@@ -85,8 +86,8 @@ fn launch_python_backend() -> Result<Child, String> {
 
 /// Stop the Python backend process
 fn stop_python_backend() {
-    unsafe {
-        if let Some(mut child) = PYTHON_PROCESS.take() {
+    if let Ok(mut process) = PYTHON_PROCESS.lock() {
+        if let Some(mut child) = process.take() {
             let _ = child.kill();
             let _ = child.wait();
             println!("✅ Python backend process stopped");
@@ -100,8 +101,8 @@ fn main() {
             // Launch Python backend on app startup
             match launch_python_backend() {
                 Ok(child) => {
-                    unsafe {
-                        PYTHON_PROCESS = Some(child);
+                    if let Ok(mut process) = PYTHON_PROCESS.lock() {
+                        *process = Some(child);
                     }
                     println!("✅ Backend launched successfully");
                 }

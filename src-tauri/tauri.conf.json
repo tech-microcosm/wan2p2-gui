@@ -30,7 +30,6 @@
     "targets": [
       "deb",
       "appimage",
-      "dmg",
       "msi"
     ],
     "icon": [
