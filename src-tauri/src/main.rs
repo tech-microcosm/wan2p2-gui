@@ -7,10 +7,12 @@ use std::process::{Command, Child};
 use std::thread;
 use std::time::Duration;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 use tokio::net::TcpListener;
 
 static PYTHON_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+static APP_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 fn get_app_version() -> String {
@@ -108,6 +110,14 @@ fn stop_python_backend() {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
+            // Prevent duplicate initialization
+            if APP_INITIALIZED.swap(true, Ordering::SeqCst) {
+                println!("⚠️ App already initialized, skipping setup");
+                return Ok(());
+            }
+            
+            println!("🚀 Starting Wan2.2 Video Generator...");
+            
             // Launch Python backend on app startup
             match launch_python_backend() {
                 Ok(child) => {
@@ -118,33 +128,24 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ {}", e);
-                    std::process::exit(1);
+                    // Don't exit - let the window show an error page
+                    return Ok(());
                 }
             }
             
-            // Wait for backend to be ready
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            if !rt.block_on(wait_for_backend(30)) {
-                eprintln!("❌ Backend failed to start");
-                std::process::exit(1);
-            }
-            
-            // Load the backend URL using Tauri's native navigation
-            let window = app.get_webview_window("main").unwrap();
-            let url = "http://localhost:7860".parse().unwrap();
-            let _ = window.navigate(url);
-            
-            println!("✅ Application ready - navigated to http://localhost:7860");
+            // The loading page (index.html) will automatically check for backend
+            // and redirect when ready - no JavaScript eval needed from Rust
+            println!("✅ Application setup complete - loading page will redirect when backend is ready");
             
             Ok(())
         })
         .on_window_event(|window, event| {
             match event {
-                tauri::WindowEvent::CloseRequested { api, .. } => {
+                tauri::WindowEvent::CloseRequested { .. } => {
                     // Stop the backend when the window is closed
+                    println!("🛑 Window close requested, stopping backend...");
                     stop_python_backend();
-                    api.prevent_close();
-                    window.close().unwrap();
+                    // Let the window close normally - don't prevent it
                 }
                 _ => {}
             }

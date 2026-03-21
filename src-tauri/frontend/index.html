@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wan2.2 Video Generator - Loading</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 30px auto;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Wan2.2 Video Generator</h1>
+        <div class="spinner"></div>
+        <p>Starting video generation backend...</p>
+        <p class="status" id="status">Please wait...</p>
+    </div>
+    <script>
+        // Check if backend is ready and redirect
+        let attempts = 0;
+        const maxAttempts = 120; // 2 minutes max
+        
+        function checkBackend() {
+            attempts++;
+            document.getElementById('status').textContent = `Connecting... (attempt ${attempts})`;
+            
+            fetch('http://localhost:7860/', { mode: 'no-cors' })
+                .then(() => {
+                    // Backend is ready, redirect
+                    window.location.href = 'http://localhost:7860/';
+                })
+                .catch(() => {
+                    if (attempts < maxAttempts) {
+                        setTimeout(checkBackend, 1000);
+                    } else {
+                        document.getElementById('status').textContent = 'Backend failed to start. Please restart the application.';
+                    }
+                });
+        }
+        
+        // Start checking after 2 seconds
+        setTimeout(checkBackend, 2000);
+    </script>
+</body>
+</html>

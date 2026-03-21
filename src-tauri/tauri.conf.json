@@ -5,13 +5,13 @@
   "build": {
     "beforeDevCommand": "echo 'Dev mode'",
     "beforeBuildCommand": "echo 'Building'",
-    "devUrl": "http://localhost:7860",
-    "frontendDist": "../dist"
+    "frontendDist": "frontend"
   },
   "app": {
     "windows": [
       {
         "title": "Wan2.2 Video Generator",
+        "label": "main",
         "width": 1400,
         "height": 900,
         "minWidth": 800,
@@ -23,11 +23,8 @@
     ],
     "security": {
       "csp": null,
-      "dangerousDisableAssetCspModification": {
-        "script": ["'unsafe-inline'", "'unsafe-eval'"]
-      }
-    },
-    "withGlobalTauri": false
+      "dangerousDisableAssetCspModification": true
+    }
   },
   "bundle": {
     "active": true,
