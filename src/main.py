@@ -274,7 +274,10 @@ def launch_pod_and_setup(
         yield f"❌ {key_error}"
         yield "\n⚠️ Make sure your SSH public key is added to RunPod settings:"
         yield "   1. Go to https://runpod.io/console/user/settings"
-        yield "   2. Add your public key from ~/.ssh/id_ed25519.pub"
+        yield "   2. Click 'SSH Public Keys' and add your public key"
+        yield "   3. Your public key is typically at:"
+        yield "      - Windows: C:\\Users\\YourName\\.ssh\\id_ed25519.pub"
+        yield "      - macOS/Linux: ~/.ssh/id_ed25519.pub"
         return
     
     try:
@@ -1117,16 +1120,26 @@ This tab auto-detects your SSH key. Copy the **public key** below and paste it i
                 gr.Markdown("""
 ---
 **How it works:**
-1. Your SSH key is auto-detected from `~/.ssh/`
+1. Your SSH key is auto-detected from your system
 2. Copy the public key above and add it to [RunPod SSH Settings](https://www.runpod.io/console/user/settings)
 3. The selected key is saved and reused automatically for future sessions
 4. To use a different key, select it from the dropdown above
 
-**No SSH key?** Run this in your terminal:
-```
+**No SSH key? Generate one:**
+
+**Windows (PowerShell):**
+```powershell
 ssh-keygen -t ed25519 -C "your_email@example.com"
+# Key saved to: C:\\Users\\YourName\\.ssh\\id_ed25519
 ```
-Then refresh this page.
+
+**macOS/Linux (Terminal):**
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com"
+# Key saved to: ~/.ssh/id_ed25519
+```
+
+After generating, **restart this app** to auto-detect your new key.
                 """)
             
             # ===== SETUP & CONNECTION TAB =====
@@ -1607,7 +1620,7 @@ def main():
     app.launch(
         server_name="127.0.0.1",
         server_port=7860,
-        inbrowser=True,
+        inbrowser=False,  # Don't open browser - we have desktop window
         share=False,
         theme=gr.themes.Soft(),
         css="""

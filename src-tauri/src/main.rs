@@ -53,44 +53,101 @@ async fn wait_for_backend(max_attempts: u32) -> bool {
 
 /// Launch the Python backend executable
 fn launch_python_backend() -> Result<Child, String> {
+    // In dev mode, try to run Python script directly from venv
+    #[cfg(debug_assertions)]
+    {
+        let venv_python = if cfg!(windows) {
+            "../venv/Scripts/python.exe"
+        } else {
+            "../venv/bin/python"
+        };
+        
+        // Check if venv python exists
+        if std::path::Path::new(&venv_python).exists() {
+            println!("🚀 [DEV MODE] Launching Python backend from venv: {} -m src.main", venv_python);
+            
+            // Run as module from project root to support relative imports
+            let child = Command::new(venv_python)
+                .arg("-m")
+                .arg("src.main")
+                .current_dir("..") // Run from project root
+                .spawn()
+                .map_err(|e| format!("Failed to launch Python script: {}", e))?;
+            
+            println!("✅ Python backend process started (PID: {})", child.id());
+            return Ok(child);
+        }
+    }
+    
+    // Production mode or fallback: use PyInstaller executable
     let exe_name = if cfg!(windows) {
         "wan2p2-gui.exe"
     } else {
         "wan2p2-gui"
     };
     
+    // Get the current executable's directory to avoid recursion
+    let current_exe = std::env::current_exe().unwrap_or_default();
+    let current_exe_str = current_exe.to_string_lossy().to_string();
+    
     // Try multiple paths in order of preference
     let paths = vec![
+        // Development mode (from src-tauri directory) - check this first
+        format!("../dist/wan2p2-gui/{}", exe_name),
+        // Development mode (from project root)
+        format!("./dist/wan2p2-gui/{}", exe_name),
         // Production: bundled resources directory
         format!("./resources/wan2p2-gui/{}", exe_name),
-        // Development mode
-        format!("./dist/wan2p2-gui/{}", exe_name),
         // Production: bundled with app
         format!("./wan2p2-gui/{}", exe_name),
         // macOS app bundle
         format!("../Resources/wan2p2-gui/{}", exe_name),
-        // Windows portable
-        exe_name.to_string(),
     ];
+    
+    println!("🔍 [DEBUG] Searching for Python backend executable...");
+    println!("🔍 [DEBUG] Current working directory: {:?}", std::env::current_dir());
     
     let mut exe_path = String::new();
     for path in &paths {
-        if std::path::Path::new(&path).exists() {
+        let exists = std::path::Path::new(&path).exists();
+        println!("🔍 [DEBUG] Checking path: {} - Exists: {}", path, exists);
+        if exists {
+            // Check if this is the same as the current executable to prevent recursion
+            let canonical_path = std::fs::canonicalize(path).unwrap_or_default();
+            let canonical_current = std::fs::canonicalize(&current_exe).unwrap_or_default();
+            
+            if canonical_path == canonical_current {
+                println!("⚠️  [DEBUG] Skipping {} - it's the current executable (would cause infinite loop)", path);
+                continue;
+            }
+            
             exe_path = path.clone();
+            println!("✅ [DEBUG] Found backend at: {}", exe_path);
             break;
         }
     }
     
     if exe_path.is_empty() {
-        let paths_str = paths.join(", ");
-        return Err(format!("Python backend executable not found. Checked: {}", paths_str));
+        let paths_str = paths.join("\n  - ");
+        let error_msg = format!(
+            "❌ Python backend executable not found!\n\nSearched paths:\n  - {}\n\nCurrent directory: {:?}\n\nCurrent executable: {}\n\nPlease ensure the Python backend is built using:\n  python -m pip install -r requirements.txt\n  .\\build_executable.bat",
+            paths_str,
+            std::env::current_dir(),
+            current_exe_str
+        );
+        println!("{}", error_msg);
+        return Err(error_msg);
     }
     
     println!("🚀 Launching Python backend from: {}", exe_path);
     
     let child = Command::new(&exe_path)
         .spawn()
-        .map_err(|e| format!("Failed to launch Python backend at {}: {}", exe_path, e))?;
+        .map_err(|e| {
+            let error_msg = format!("❌ Failed to launch Python backend at {}: {}\n\nPlease check:\n1. Python backend is built\n2. All dependencies are installed\n3. No antivirus blocking execution", exe_path, e);
+            println!("{}", error_msg);
+            error_msg
+        })?;
     
     println!("✅ Python backend process started (PID: {})", child.id());
     Ok(child)
