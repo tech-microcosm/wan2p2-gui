@@ -129,9 +129,7 @@ fn main() {
                 std::process::exit(1);
             }
             
-            // Get the main window and navigate to the backend
-            let window = app.get_webview_window("main").unwrap();
-            let _ = window.eval("window.location.href = 'http://localhost:7860'");
+            println!("✅ Application ready - window will load http://localhost:7860");
             
             Ok(())
         })
