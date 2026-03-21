@@ -129,7 +129,12 @@ fn main() {
                 std::process::exit(1);
             }
             
-            println!("✅ Application ready - window will load http://localhost:7860");
+            // Load the backend URL using Tauri's native navigation
+            let window = app.get_webview_window("main").unwrap();
+            let url = "http://localhost:7860".parse().unwrap();
+            let _ = window.navigate(url);
+            
+            println!("✅ Application ready - navigated to http://localhost:7860");
             
             Ok(())
         })

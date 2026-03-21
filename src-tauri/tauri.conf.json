@@ -18,13 +18,16 @@
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
-        "focus": true,
-        "url": "http://localhost:7860"
+        "focus": true
       }
     ],
     "security": {
-      "csp": null
-    }
+      "csp": null,
+      "dangerousDisableAssetCspModification": {
+        "script": ["'unsafe-inline'", "'unsafe-eval'"]
+      }
+    },
+    "withGlobalTauri": false
   },
   "bundle": {
     "active": true,
