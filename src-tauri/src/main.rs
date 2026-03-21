@@ -51,104 +51,72 @@ async fn wait_for_backend(max_attempts: u32) -> bool {
     false
 }
 
-/// Launch the Python backend executable
-fn launch_python_backend() -> Result<Child, String> {
-    // In dev mode, try to run Python script directly from venv
-    #[cfg(debug_assertions)]
-    {
-        let venv_python = if cfg!(windows) {
-            "../venv/Scripts/python.exe"
-        } else {
-            "../venv/bin/python"
-        };
+/// Launch the Python backend process
+fn launch_python_backend(app: &tauri::App) -> Result<Child, String> {
+    // Check if we're in dev mode by looking for venv
+    let venv_python = if cfg!(windows) {
+        "../venv/Scripts/python.exe"
+    } else {
+        "../venv/bin/python"
+    };
+    
+    if std::path::Path::new(venv_python).exists() {
+        println!("🚀 [DEV MODE] Launching Python backend from venv: {} -m src.main", venv_python);
+        let child = Command::new(venv_python)
+            .args(&["-m", "src.main"])
+            .spawn()
+            .map_err(|e| {
+                let error_msg = format!("❌ Failed to launch Python backend from venv: {}", e);
+                println!("{}", error_msg);
+                error_msg
+            })?;
         
-        // Check if venv python exists
-        if std::path::Path::new(&venv_python).exists() {
-            println!("🚀 [DEV MODE] Launching Python backend from venv: {} -m src.main", venv_python);
-            
-            // Run as module from project root to support relative imports
-            let child = Command::new(venv_python)
-                .arg("-m")
-                .arg("src.main")
-                .current_dir("..") // Run from project root
-                .spawn()
-                .map_err(|e| format!("Failed to launch Python script: {}", e))?;
-            
-            println!("✅ Python backend process started (PID: {})", child.id());
-            return Ok(child);
-        }
+        println!("✅ Python backend process started (PID: {})", child.id());
+        return Ok(child);
     }
     
-    // Production mode or fallback: use PyInstaller executable
+    // Production mode: use Tauri's resource resolver API
     let exe_name = if cfg!(windows) {
         "wan2p2-gui.exe"
     } else {
         "wan2p2-gui"
     };
     
-    // Get the current executable's directory to avoid recursion
-    let current_exe = std::env::current_exe().unwrap_or_default();
-    let current_exe_str = current_exe.to_string_lossy().to_string();
-    let exe_dir = current_exe.parent().unwrap_or_else(|| std::path::Path::new("."));
-    
-    // Try multiple paths in order of preference
-    let paths = vec![
-        // Production: bundled resources directory (relative to exe)
-        exe_dir.join("resources").join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
-        // Production: bundled with app (relative to exe)
-        exe_dir.join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
-        // Development mode (from src-tauri directory) - check this first
-        format!("../dist/wan2p2-gui/{}", exe_name),
-        // Development mode (from project root)
-        format!("./dist/wan2p2-gui/{}", exe_name),
-        // macOS app bundle
-        exe_dir.join("..").join("Resources").join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
-    ];
-    
     eprintln!("🔍 [DEBUG] Searching for Python backend executable...");
-    eprintln!("🔍 [DEBUG] Current executable: {}", current_exe_str);
-    eprintln!("🔍 [DEBUG] Executable directory: {:?}", exe_dir);
     eprintln!("🔍 [DEBUG] Current working directory: {:?}", std::env::current_dir());
     
-    let mut exe_path = String::new();
-    for path in &paths {
-        let exists = std::path::Path::new(&path).exists();
-        eprintln!("🔍 [DEBUG] Checking path: {} - Exists: {}", path, exists);
-        if exists {
-            // Check if this is the same as the current executable to prevent recursion
-            let canonical_path = std::fs::canonicalize(path).unwrap_or_default();
-            let canonical_current = std::fs::canonicalize(&current_exe).unwrap_or_default();
-            
-            if canonical_path == canonical_current {
-                eprintln!("⚠️  [DEBUG] Skipping {} - it's the current executable (would cause infinite loop)", path);
-                continue;
-            }
-            
-            exe_path = path.clone();
-            eprintln!("✅ [DEBUG] Found backend at: {}", exe_path);
-            break;
-        }
-    }
+    // Use Tauri's official resource path resolver
+    let resource_path = format!("resources/wan2p2-gui/{}", exe_name);
+    eprintln!("🔍 [DEBUG] Resolving resource path: {}", resource_path);
     
-    if exe_path.is_empty() {
-        let paths_str = paths.join("\n  - ");
+    let backend_path = app.path()
+        .resolve(&resource_path, tauri::path::BaseDirectory::Resource)
+        .map_err(|e| {
+            let error_msg = format!("❌ Failed to resolve resource path '{}': {}", resource_path, e);
+            eprintln!("{}", error_msg);
+            error_msg
+        })?;
+    
+    eprintln!("🔍 [DEBUG] Resolved backend path: {:?}", backend_path);
+    eprintln!("🔍 [DEBUG] Backend exists: {}", backend_path.exists());
+    
+    if !backend_path.exists() {
         let error_msg = format!(
-            "❌ Python backend executable not found!\n\nSearched paths:\n  - {}\n\nCurrent directory: {:?}\n\nCurrent executable: {}\n\nPlease ensure the Python backend is built using:\n  python -m pip install -r requirements.txt\n  .\\build_executable.bat",
-            paths_str,
-            std::env::current_dir(),
-            current_exe_str
+            "❌ Python backend executable not found at resolved path: {:?}\n\nPlease ensure the Python backend is built and bundled correctly.",
+            backend_path
         );
-        println!("{}", error_msg);
+        eprintln!("{}", error_msg);
         return Err(error_msg);
     }
     
-    println!("🚀 Launching Python backend from: {}", exe_path);
+    eprintln!("✅ [DEBUG] Found backend at: {:?}", backend_path);
+    eprintln!("🚀 Launching Python backend from: {:?}", backend_path);
     
-    let child = Command::new(&exe_path)
+    let child = Command::new(&backend_path)
         .spawn()
         .map_err(|e| {
-            let error_msg = format!("❌ Failed to launch Python backend at {}: {}\n\nPlease check:\n1. Python backend is built\n2. All dependencies are installed\n3. No antivirus blocking execution", exe_path, e);
-            println!("{}", error_msg);
+            let error_msg = format!("❌ Failed to launch Python backend at {:?}: {}\n\nPlease check:\n1. Python backend is built\n2. All dependencies are installed\n3. No antivirus blocking execution", backend_path, e);
+            eprintln!("{}", error_msg);
             error_msg
         })?;
     
@@ -194,7 +162,7 @@ fn main() {
             
             // Launch Python backend on app startup
             println!("🐍 [SETUP] Launching Python backend...");
-            match launch_python_backend() {
+            match launch_python_backend(app) {
                 Ok(child) => {
                     if let Ok(mut process) = PYTHON_PROCESS.lock() {
                         *process = Some(child);
