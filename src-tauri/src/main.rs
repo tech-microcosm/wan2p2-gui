@@ -89,19 +89,20 @@ fn launch_python_backend() -> Result<Child, String> {
     // Get the current executable's directory to avoid recursion
     let current_exe = std::env::current_exe().unwrap_or_default();
     let current_exe_str = current_exe.to_string_lossy().to_string();
+    let exe_dir = current_exe.parent().unwrap_or_else(|| std::path::Path::new("."));
     
     // Try multiple paths in order of preference
     let paths = vec![
+        // Production: bundled resources directory (relative to exe)
+        exe_dir.join("resources").join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
+        // Production: bundled with app (relative to exe)
+        exe_dir.join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
         // Development mode (from src-tauri directory) - check this first
         format!("../dist/wan2p2-gui/{}", exe_name),
         // Development mode (from project root)
         format!("./dist/wan2p2-gui/{}", exe_name),
-        // Production: bundled resources directory
-        format!("./resources/wan2p2-gui/{}", exe_name),
-        // Production: bundled with app
-        format!("./wan2p2-gui/{}", exe_name),
         // macOS app bundle
-        format!("../Resources/wan2p2-gui/{}", exe_name),
+        exe_dir.join("..").join("Resources").join("wan2p2-gui").join(&exe_name).to_string_lossy().to_string(),
     ];
     
     println!("🔍 [DEBUG] Searching for Python backend executable...");
