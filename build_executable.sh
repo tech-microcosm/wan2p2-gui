@@ -19,7 +19,7 @@ rm -rf build dist wan2p2-gui.build
 
 # Build the executable
 echo "🏗️  Building executable..."
-pyinstaller --clean --noconfirm wan2p2_gui.spec
+pyinstaller --clean --noconfirm wan2p2-gui.spec
 
 # Check if build was successful
 if [ -d "dist/wan2p2-gui" ]; then

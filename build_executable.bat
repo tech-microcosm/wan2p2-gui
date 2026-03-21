@@ -23,7 +23,7 @@ if exist wan2p2-gui.build rmdir /s /q wan2p2-gui.build
 
 REM Build the executable
 echo 🏗️  Building executable...
-pyinstaller --clean --noconfirm wan2p2_gui.spec
+pyinstaller --clean --noconfirm wan2p2-gui.spec
 
 REM Check if build was successful
 if exist "dist\wan2p2-gui" (
