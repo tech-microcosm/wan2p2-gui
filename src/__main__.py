@@ -12,8 +12,7 @@ if str(parent_dir) not in sys.path:
     sys.path.insert(0, str(parent_dir))
 
 # Import and run the main module
-from src import main
+from src.main import main
 
 if __name__ == "__main__":
-    # The main module will execute when imported
-    pass
+    main()

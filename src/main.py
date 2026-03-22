@@ -18,9 +18,15 @@ from pathlib import Path
 
 import gradio as gr
 
-# Local outputs directory
-OUTPUTS_DIR = Path(__file__).parent.parent / "outputs"
-OUTPUTS_DIR.mkdir(exist_ok=True)
+# Local outputs directory - use user's Documents folder to avoid permission issues in Program Files
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle - use user's Documents folder
+    OUTPUTS_DIR = Path.home() / "Documents" / "Wan2.2 Video Generator" / "outputs"
+else:
+    # Running in development mode - use project directory
+    OUTPUTS_DIR = Path(__file__).parent.parent / "outputs"
+
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 from .ssh_manager import SSHManager
 from .ssh_key_manager import SSHKeyManager
