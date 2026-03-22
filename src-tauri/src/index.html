@@ -109,7 +109,7 @@
     </div>
     
     <script>
-        // Check if backend is ready and redirect
+        // Check if backend is ready and load it in iframe
         async function checkBackend() {
             const maxAttempts = 60; // 30 seconds with 500ms intervals
             
@@ -121,12 +121,12 @@
                     });
                     
                     // If we get here, the backend is responding
-                    document.getElementById('status').textContent = '✅ Backend ready! Redirecting...';
+                    document.getElementById('status').textContent = '✅ Backend ready! Loading...';
                     document.getElementById('status').classList.add('success');
                     
-                    // Redirect to the Gradio UI
+                    // Replace the entire page with an iframe to avoid navigation issues
                     setTimeout(() => {
-                        window.location.href = 'http://localhost:7860';
+                        document.body.innerHTML = '<iframe src="http://localhost:7860" style="position:fixed;top:0;left:0;width:100%;height:100%;border:none;margin:0;padding:0;"></iframe>';
                     }, 500);
                     
                     return;
