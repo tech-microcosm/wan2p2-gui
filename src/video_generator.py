@@ -245,12 +245,77 @@ Shortfall: {vram_required - current_vram}GB
     
     def _enhance_prompt_llm(self, prompt: str, model: str, input_image: Optional[str] = None) -> str:
         """
-        Enhance prompt with cinematic quality keywords.
-        Uses fast rule-based enhancement instead of LLM for better performance.
+        Enhance prompt using Qwen LLM with optimizations for speed.
+        Uses smaller 1.5B model with caching for faster subsequent calls.
         """
-        # Use the fast fallback method directly
-        # Loading a 3B LLM model is too slow and competes with video generation
-        return self._enhance_prompt(prompt)
+        try:
+            escaped_prompt = prompt.replace("'", "'\\''").replace('"', '\\"')
+            
+            # Optimized LLM enhancement with smaller model and caching
+            extend_cmd = f"""cd /root/Wan2.2 && python -c "
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+import sys
+
+try:
+    # Use smaller 1.5B model instead of 3B for faster loading
+    model_name = 'Qwen/Qwen2.5-1.5B-Instruct'
+    cache_dir = '/root/.cache/huggingface'
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,
+        device_map='auto',
+        cache_dir=cache_dir,
+        trust_remote_code=True,
+        low_cpu_mem_usage=True
+    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, trust_remote_code=True)
+    
+    system_prompt = '''You are a professional video prompt engineer. Enhance the prompt with rich visual details.
+Include: camera angles, lighting, motion, atmosphere, and quality keywords.
+Keep it concise (2-3 sentences max). Output ONLY the enhanced prompt.'''
+    
+    messages = [
+        {{'role': 'system', 'content': system_prompt}},
+        {{'role': 'user', 'content': 'Enhance: {escaped_prompt}'}}
+    ]
+    
+    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = tokenizer([text], return_tensors='pt').to(model.device)
+    
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=120,
+            temperature=0.7,
+            top_p=0.9,
+            do_sample=True,
+            num_beams=1,
+            pad_token_id=tokenizer.eos_token_id
+        )
+    
+    response = tokenizer.decode(outputs[0][len(inputs.input_ids[0]):], skip_special_tokens=True)
+    print(response.strip())
+    
+except Exception as e:
+    print('{escaped_prompt}', end='')
+    sys.exit(0)
+"
+"""
+            exit_code, stdout, stderr = self.ssh.execute_command(extend_cmd, timeout=180)
+            
+            if exit_code == 0 and stdout.strip():
+                enhanced = stdout.strip()
+                # If response is too similar to input or too long, use fallback
+                if len(enhanced) > 500 or enhanced == prompt:
+                    return self._enhance_prompt(prompt)
+                return enhanced
+            else:
+                return self._enhance_prompt(prompt)
+                
+        except Exception as e:
+            return self._enhance_prompt(prompt)
     
     def _upload_file(self, local_path: str, remote_filename: str) -> str:
         """Upload a file to the pod and return the remote path."""

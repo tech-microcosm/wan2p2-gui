@@ -711,62 +711,175 @@ def stop_generation() -> str:
 
 
 def enhance_prompt_with_llm(current_prompt: str) -> str:
-    """Generate an enhanced version of the prompt using rule-based enhancement."""
+    """Generate an enhanced version of the prompt using Qwen LLM."""
+    if not app_state.connected or not app_state.ssh_manager:
+        return "❌ Not connected to GPU pod. Please connect first."
+    
     if not current_prompt.strip():
         return "❌ Please enter a prompt first, then click 'Generate Enhancement'."
     
-    # Fast rule-based enhancement instead of slow LLM loading
-    # This adds cinematic quality keywords without the overhead of loading a 3B model
+    try:
+        import base64
+        
+        prompt_b64 = base64.b64encode(current_prompt.encode()).decode()
+        
+        # Optimized enhancement script with model caching
+        enhance_script = f"""
+import base64
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+import os
+
+prompt_b64 = "{prompt_b64}"
+original_prompt = base64.b64decode(prompt_b64).decode()
+
+# Use smaller, faster Qwen 1.5B model instead of 3B
+model_name = "Qwen/Qwen2.5-1.5B-Instruct"
+cache_dir = "/root/.cache/huggingface"
+
+# Load model with optimizations
+tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name, 
+    torch_dtype=torch.float16,  # Use FP16 for faster inference
+    device_map="auto",
+    cache_dir=cache_dir,
+    trust_remote_code=True,
+    low_cpu_mem_usage=True
+)
+
+system_prompt = \"\"\"You are a video prompt engineer. Enhance the user's prompt into a concise, vivid video generation prompt.
+
+Rules:
+- Output ONLY 2-3 sentences maximum
+- Include visual details, camera style, and motion
+- Add quality keywords (4K, cinematic)
+- No explanations, no quotes, no prefixes
+- Keep it concise and focused on visual elements\"\"\"
+
+messages = [
+    {{"role": "system", "content": system_prompt}},
+    {{"role": "user", "content": f"Enhance this video prompt: {{original_prompt}}"}}
+]
+
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+# Optimized generation parameters for speed
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs, 
+        max_new_tokens=120,  # Reduced from 150
+        temperature=0.7,
+        top_p=0.9,
+        do_sample=True,
+        num_beams=1,  # Greedy decoding is faster
+        pad_token_id=tokenizer.eos_token_id
+    )
     
-    prompt = current_prompt.strip()
-    
-    # Check if already enhanced
-    if any(kw in prompt.lower() for kw in ['high quality', '4k', 'professional', 'cinematic', 'sharp focus']):
-        return prompt + " (already enhanced)"
-    
-    # Add quality keywords
-    quality_suffix = ", high quality, 4K, professional cinematography, sharp focus, smooth motion, cinematic lighting"
-    
-    enhanced = prompt.rstrip('.') + quality_suffix
-    
-    return enhanced
+response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+print(response.strip())
+"""
+        
+        script_b64 = base64.b64encode(enhance_script.encode()).decode()
+        cmd = f'echo "{script_b64}" | base64 -d > /tmp/enhance_prompt.py && cd /root/Wan2.2 && python /tmp/enhance_prompt.py'
+        
+        # Increased timeout for first-time model download
+        exit_code, stdout, stderr = app_state.ssh_manager.execute_command(cmd, timeout=180)
+        
+        if exit_code == 0 and stdout.strip():
+            return stdout.strip()
+        else:
+            return f"❌ Enhancement failed: {stderr[:300] if stderr else 'Unknown error'}"
+            
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 
 def refine_prompt_with_llm(current_prompt: str, user_message: str) -> str:
-    """Refine the prompt based on user feedback using simple text manipulation."""
+    """Refine the prompt based on user feedback using Qwen LLM."""
+    if not app_state.connected or not app_state.ssh_manager:
+        return "❌ Not connected to GPU pod. Please connect first."
+    
     if not current_prompt.strip():
         return "❌ Please enter a prompt first, then ask me to refine it."
     
     if not user_message.strip():
         return "❌ Please enter your refinement request."
     
-    # Simple rule-based refinement based on common requests
-    prompt = current_prompt.strip()
-    request = user_message.lower().strip()
+    try:
+        import base64
+        
+        prompt_b64 = base64.b64encode(current_prompt.encode()).decode()
+        message_b64 = base64.b64encode(user_message.encode()).decode()
+        
+        refine_script = f"""
+import base64
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+prompt_b64 = "{prompt_b64}"
+message_b64 = "{message_b64}"
+
+current_prompt = base64.b64decode(prompt_b64).decode()
+user_request = base64.b64decode(message_b64).decode()
+
+# Use smaller, faster Qwen 1.5B model
+model_name = "Qwen/Qwen2.5-1.5B-Instruct"
+cache_dir = "/root/.cache/huggingface"
+
+tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    torch_dtype=torch.float16,
+    device_map="auto",
+    cache_dir=cache_dir,
+    trust_remote_code=True,
+    low_cpu_mem_usage=True
+)
+
+system_prompt = f\"\"\"You are a video prompt refinement assistant. Refine the video generation prompt based on the user request.
+
+Current prompt: {{current_prompt}}
+User request: {{user_request}}
+
+Output ONLY the refined prompt text directly. No explanations, no quotes, no prefixes.\"\"\"
+
+messages = [
+    {{"role": "system", "content": system_prompt}},
+    {{"role": "user", "content": "Refine the prompt now."}}
+]
+
+text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=150,
+        temperature=0.7,
+        top_p=0.9,
+        do_sample=True,
+        num_beams=1,
+        pad_token_id=tokenizer.eos_token_id
+    )
     
-    # Handle common refinement requests
-    if 'cinematic' in request or 'movie' in request:
-        if 'cinematic' not in prompt.lower():
-            prompt += ", cinematic composition, film grain, anamorphic lens"
-    
-    if 'dramatic' in request or 'intense' in request:
-        if 'dramatic' not in prompt.lower():
-            prompt += ", dramatic lighting, intense atmosphere"
-    
-    if 'slow' in request or 'smooth' in request:
-        if 'slow motion' not in prompt.lower():
-            prompt += ", slow motion, smooth camera movement"
-    
-    if 'bright' in request or 'sunny' in request:
-        prompt += ", bright natural lighting, sunny day"
-    
-    if 'dark' in request or 'night' in request:
-        prompt += ", dark moody atmosphere, nighttime scene"
-    
-    if 'colorful' in request or 'vibrant' in request:
-        prompt += ", vibrant colors, saturated tones"
-    
-    return prompt + f"\n\n💡 Applied: {user_message}"
+response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+print(response.strip())
+"""
+        
+        script_b64 = base64.b64encode(refine_script.encode()).decode()
+        cmd = f'echo "{script_b64}" | base64 -d > /tmp/refine_prompt.py && cd /root/Wan2.2 && python /tmp/refine_prompt.py'
+        
+        exit_code, stdout, stderr = app_state.ssh_manager.execute_command(cmd, timeout=180)
+        
+        if exit_code == 0 and stdout.strip():
+            return stdout.strip()
+        else:
+            return f"❌ LLM refinement failed: {stderr[:300] if stderr else 'Unknown error'}"
+            
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 
 def generate_video_wrapper(
