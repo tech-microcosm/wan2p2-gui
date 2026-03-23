@@ -411,6 +411,10 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback=lambda line: self._parse_generation_progress(line, progress_callback)
         )
         
+        # Check for OOM errors
+        if self._check_oom_error(stderr, progress_callback):
+            return None, "❌ I2V generation failed: CUDA Out of Memory (OOM). GPU ran out of VRAM."
+        
         if exit_code != 0:
             return None, f"❌ I2V generation failed: {stderr[:500]}"
         
@@ -518,6 +522,10 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             timeout=1800  # 30 minutes for S2V model loading + generation
         )
         
+        # Check for OOM errors
+        if self._check_oom_error(stderr, progress_callback):
+            return None, "❌ S2V generation failed: CUDA Out of Memory (OOM). GPU ran out of VRAM."
+        
         if exit_code != 0:
             error_msg = stderr if stderr else stdout
             return None, f"❌ S2V generation failed: {error_msg[-1000:]}"
@@ -579,18 +587,29 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             if disable_offloading:
                 progress_callback(f"   ⚡ Offloading disabled - using full VRAM mode (faster)")
         
+        # Check memory status before generation
+        mem_error = self._check_memory_status(progress_callback)
+        if mem_error:
+            return None, mem_error
+        
         # Build optimization flags based on offloading setting and model type
-        # A14B models are larger and need more aggressive optimization
+        # T2V-A14B works best on 48GB with minimal offloading (just dtype conversion)
+        # Aggressive offloading (--offload_model True --t5_cpu) causes OOM on 48GB
         is_14b_model = '14b' in model.lower() or 'a14b' in model.lower()
         
         if disable_offloading and not is_14b_model:
             # High VRAM mode for smaller models (5B): only dtype conversion
             # Requires ~24-30GB VRAM but faster
             opt_flags = "--convert_model_dtype"
+        elif is_14b_model and model == 't2v-a14b':
+            # T2V-A14B on 48GB: use minimal offloading (just dtype conversion)
+            # Full offloading causes OOM due to memory fragmentation
+            opt_flags = "--convert_model_dtype"
+            if progress_callback:
+                progress_callback("   ⚡ Using optimized settings for T2V-A14B on 48GB VRAM")
         else:
-            # For A14B models or when offloading is enabled:
+            # For I2V-A14B or when offloading is explicitly enabled:
             # Use T5 CPU offloading to save ~11GB VRAM
-            # This is required for 48GB GPUs with 14B models at 720P
             opt_flags = "--offload_model True --t5_cpu --convert_model_dtype"
         
         # Note: --use_tiling is not available in standard Wan2.2
@@ -614,6 +633,10 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback=lambda line: self._parse_generation_progress(line, progress_callback)
         )
         
+        # Check for OOM errors
+        if self._check_oom_error(stderr, progress_callback):
+            return None, "❌ Generation failed: CUDA Out of Memory (OOM). GPU ran out of VRAM. Try reducing resolution or using a smaller model."
+        
         if exit_code != 0:
             return None, f"❌ Generation failed: {stderr[:500]}"
         
@@ -621,19 +644,9 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
         if not self.ssh.file_exists("/root/Wan2.2/output_raw.mp4"):
             return None, "❌ Generation completed but output file not found"
         
-        # Clear GPU memory before RIFE interpolation to avoid OOM
+        # Clear GPU and RAM memory before RIFE interpolation to avoid OOM
         if config.get('use_rife', False):
-            if progress_callback:
-                progress_callback(f"\n🧹 Clearing GPU memory...")
-            
-            # Kill any lingering Python processes and clear GPU memory
-            clear_cmds = [
-                "pkill -f 'python.*generate.py' || true",
-                "sleep 2",
-                "python3 -c 'import torch; torch.cuda.empty_cache(); import gc; gc.collect()' || true"
-            ]
-            for cmd in clear_cmds:
-                self.ssh.execute_command(cmd)
+            self._cleanup_memory(progress_callback)
         
         # Run RIFE interpolation only if configured for this duration
         output_file = f"/root/Wan2.2/output_{duration}s.mp4"
@@ -710,13 +723,18 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
         if progress_callback:
             progress_callback(f"\n🎥 Segment 1/2: Generating first 5 seconds with {sample_steps} steps...")
         
-        # Build optimization flags - A14B models always need offloading for 48GB GPUs
+        # Build optimization flags - same as single segment generation
         is_14b_model = '14b' in model.lower() or 'a14b' in model.lower()
         
         if disable_offloading and not is_14b_model:
             opt_flags = "--convert_model_dtype"
+        elif is_14b_model and model == 't2v-a14b':
+            # T2V-A14B on 48GB: use minimal offloading (just dtype conversion)
+            opt_flags = "--convert_model_dtype"
+            if progress_callback:
+                progress_callback("   ⚡ Using optimized settings for T2V-A14B on 48GB VRAM")
         else:
-            # For A14B models: use T5 CPU offloading to save ~11GB VRAM
+            # For I2V-A14B or when offloading is explicitly enabled
             opt_flags = "--offload_model True --t5_cpu --convert_model_dtype"
         
         # Note: --use_tiling is not available in standard Wan2.2
@@ -738,20 +756,15 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback=lambda line: self._parse_generation_progress(line, progress_callback)
         )
         
+        # Check for OOM errors
+        if self._check_oom_error(stderr, progress_callback):
+            return None, "❌ Segment 1 failed: CUDA Out of Memory (OOM). GPU ran out of VRAM."
+        
         if exit_code != 0:
             return None, f"❌ Segment 1 generation failed: {stderr[:500]}"
         
-        # Clear GPU memory before RIFE
-        if progress_callback:
-            progress_callback(f"\n🧹 Clearing GPU memory...")
-        
-        clear_cmds = [
-            "pkill -f 'python.*generate.py' || true",
-            "sleep 2",
-            "python3 -c 'import torch; torch.cuda.empty_cache(); import gc; gc.collect()' || true"
-        ]
-        for cmd in clear_cmds:
-            self.ssh.execute_command(cmd)
+        # Clear GPU and RAM memory before RIFE
+        self._cleanup_memory(progress_callback)
         
         # Interpolate segment 1
         if progress_callback:
@@ -823,20 +836,15 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback=lambda line: self._parse_generation_progress(line, progress_callback)
         )
         
+        # Check for OOM errors
+        if self._check_oom_error(stderr, progress_callback):
+            return None, "❌ Segment 2 failed: CUDA Out of Memory (OOM). GPU ran out of VRAM."
+        
         if exit_code != 0:
             return None, f"❌ Segment 2 generation failed: {stderr[:500]}"
         
-        # Clear GPU memory before RIFE
-        if progress_callback:
-            progress_callback(f"\n🧹 Clearing GPU memory...")
-        
-        clear_cmds = [
-            "pkill -f 'python.*generate.py' || true",
-            "sleep 2",
-            "python3 -c 'import torch; torch.cuda.empty_cache(); import gc; gc.collect()' || true"
-        ]
-        for cmd in clear_cmds:
-            self.ssh.execute_command(cmd)
+        # Clear GPU and RAM memory before RIFE
+        self._cleanup_memory(progress_callback)
         
         # Interpolate segment 2
         if progress_callback:
@@ -887,7 +895,93 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
         
         return local_path, "✅ 10-second video generated successfully!"
     
-    def _parse_generation_progress(self, line: str, progress_callback: Optional[Callable[[str], None]]):
+    def _check_memory_status(self, progress_callback: Optional[Callable[[str], None]] = None) -> Optional[str]:
+        """Check RAM and VRAM status. Returns error message if critical, None if OK."""
+        # Check RAM usage
+        ram_cmd = "free -g | awk '/^Mem:/ {printf \"%d %d %.0f\", $2, $3, ($3/$2)*100}'"
+        exit_code, stdout, _ = self.ssh.execute_command(ram_cmd)
+        
+        if exit_code == 0 and stdout.strip():
+            try:
+                total_ram, used_ram, ram_pct = stdout.strip().split()
+                total_ram, used_ram, ram_pct = int(total_ram), int(used_ram), float(ram_pct)
+                
+                if progress_callback:
+                    progress_callback(f"   💾 RAM: {used_ram}GB / {total_ram}GB ({ram_pct:.0f}%)")
+                
+                # Warning if RAM usage > 85%
+                if ram_pct > 85:
+                    warning = f"⚠️ RAM WARNING: {ram_pct:.0f}% used ({used_ram}/{total_ram}GB). Risk of OOM!"
+                    if progress_callback:
+                        progress_callback(f"\n{warning}")
+                    
+                    # If critically high, abort
+                    if ram_pct > 95:
+                        return f"❌ RAM CRITICAL: {ram_pct:.0f}% used. Aborting to prevent system OOM."
+            except (ValueError, IndexError):
+                pass
+        
+        # Check VRAM usage
+        vram_cmd = "nvidia-smi --query-gpu=memory.total,memory.used --format=csv,noheader,nounits | awk '{printf \"%d %d %.0f\", $1/1024, $3/1024, ($3/$1)*100}'"
+        exit_code, stdout, _ = self.ssh.execute_command(vram_cmd)
+        
+        if exit_code == 0 and stdout.strip():
+            try:
+                total_vram, used_vram, vram_pct = stdout.strip().split()
+                total_vram, used_vram, vram_pct = int(total_vram), int(used_vram), float(vram_pct)
+                
+                if progress_callback:
+                    progress_callback(f"   🎮 VRAM: {used_vram}GB / {total_vram}GB ({vram_pct:.0f}%)")
+            except (ValueError, IndexError):
+                pass
+        
+        return None
+    
+    def _cleanup_memory(self, progress_callback: Optional[Callable[[str], None]] = None):
+        """Aggressively clean up system and GPU memory."""
+        if progress_callback:
+            progress_callback("\n🧹 Cleaning up memory...")
+        
+        cleanup_cmds = [
+            # Kill any lingering Python processes
+            "pkill -9 -f 'python.*generate.py' || true",
+            "sleep 1",
+            # Clear GPU memory
+            "python3 -c 'import torch; torch.cuda.empty_cache(); import gc; gc.collect()' || true",
+            # Clear system cache (requires sudo, may fail but worth trying)
+            "sync; echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true",
+            "sleep 1"
+        ]
+        
+        for cmd in cleanup_cmds:
+            self.ssh.execute_command(cmd)
+    
+    def _check_oom_error(self, stderr: str, progress_callback: Optional[Callable[[str], None]] = None) -> bool:
+        """Check if stderr contains CUDA OOM or RAM OOM error and terminate if found."""
+        oom_indicators = [
+            'CUDA out of memory',
+            'OutOfMemoryError',
+            'RuntimeError: CUDA error: out of memory',
+            'torch.cuda.OutOfMemoryError',
+            'MemoryError',
+            'Killed',  # Linux OOM killer
+            'Cannot allocate memory'
+        ]
+        
+        for indicator in oom_indicators:
+            if indicator in stderr:
+                if progress_callback:
+                    progress_callback(f"\n❌ DETECTED: {indicator}")
+                    progress_callback("\n🛑 Auto-terminating generation due to OOM...")
+                
+                # Aggressive cleanup
+                self._cleanup_memory(progress_callback)
+                
+                return True
+        
+        return False
+    
+    def _parse_generation_progress(self, line: str, progress_callback: Optional[Callable[[str], None]] = None):
         """Parse and format generation progress output."""
         if not progress_callback:
             return
