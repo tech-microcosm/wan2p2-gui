@@ -245,75 +245,12 @@ Shortfall: {vram_required - current_vram}GB
     
     def _enhance_prompt_llm(self, prompt: str, model: str, input_image: Optional[str] = None) -> str:
         """
-        Enhance prompt using local Qwen model with detailed scene expansion.
-        Creates rich, cinematically-detailed prompts for better video generation.
+        Enhance prompt with cinematic quality keywords.
+        Uses fast rule-based enhancement instead of LLM for better performance.
         """
-        try:
-            escaped_prompt = prompt.replace("'", "'\\''").replace('"', '\\"')
-            
-            # Custom prompt template for detailed scene expansion
-            system_prompt = """You are a professional cinematographer and visual storytelling expert. Your task is to expand short video prompts into rich, detailed scene descriptions.
-
-Include specific details about:
-- Subject appearance, actions, and expressions
-- Camera angles, movement, and framing
-- Lighting conditions and atmosphere
-- Environmental details and background elements
-- Colors, textures, and visual style
-- Motion dynamics and pacing
-
-Keep the description concise but vivid (2-3 sentences max). Focus on visual elements that make compelling video."""
-
-            extend_cmd = f"""cd /root/Wan2.2 && python -c "
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-import sys
-
-try:
-    model = AutoModelForCausalLM.from_pretrained(
-        'Qwen/Qwen2.5-3B-Instruct',
-        torch_dtype=torch.bfloat16,
-        device_map='cuda'
-    )
-    tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-3B-Instruct')
-    
-    messages = [
-        {{'role': 'system', 'content': '''{system_prompt}'''}},
-        {{'role': 'user', 'content': 'Expand this video prompt with rich visual details: {escaped_prompt}'}}
-    ]
-    
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = tokenizer([text], return_tensors='pt').to('cuda')
-    
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=200,
-        temperature=0.7,
-        top_p=0.9,
-        do_sample=True
-    )
-    
-    response = tokenizer.decode(outputs[0][len(inputs.input_ids[0]):], skip_special_tokens=True)
-    print(response.strip())
-    
-except Exception as e:
-    print('{escaped_prompt}', end='')
-    sys.exit(0)
-"
-"""
-            exit_code, stdout, stderr = self.ssh.execute_command(extend_cmd, timeout=120)
-            
-            if exit_code == 0 and stdout.strip():
-                enhanced = stdout.strip()
-                # If response is too similar to input or too long, use fallback
-                if len(enhanced) > 500 or enhanced == prompt:
-                    return self._enhance_prompt(prompt)
-                return enhanced
-            else:
-                return self._enhance_prompt(prompt)
-                
-        except Exception as e:
-            return self._enhance_prompt(prompt)
+        # Use the fast fallback method directly
+        # Loading a 3B LLM model is too slow and competes with video generation
+        return self._enhance_prompt(prompt)
     
     def _upload_file(self, local_path: str, remote_filename: str) -> str:
         """Upload a file to the pod and return the remote path."""
