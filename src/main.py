@@ -410,7 +410,8 @@ def launch_pod_and_setup(
         app_state.video_generator = VideoGenerator(
             app_state.ssh_manager,
             app_state.model_manager,
-            app_state.gpu_manager
+            app_state.gpu_manager,
+            outputs_dir=str(OUTPUTS_DIR)
         )
         
         app_state.connected = True
@@ -498,7 +499,8 @@ def test_connection(ssh_ip: str, ssh_port: int, ssh_key_path: str) -> Generator[
         app_state.video_generator = VideoGenerator(
             app_state.ssh_manager, 
             app_state.model_manager, 
-            app_state.gpu_manager
+            app_state.gpu_manager,
+            outputs_dir=str(OUTPUTS_DIR)
         )
         
         # Save configuration

@@ -37,7 +37,8 @@ class VideoGenerator:
         self, 
         ssh_manager: SSHManager, 
         model_manager: ModelManager,
-        gpu_manager: Optional[GPUManager] = None
+        gpu_manager: Optional[GPUManager] = None,
+        outputs_dir: Optional[str] = None
     ):
         """
         Initialize video generator.
@@ -46,10 +47,12 @@ class VideoGenerator:
             ssh_manager: SSHManager for remote operations
             model_manager: ModelManager for model downloads
             gpu_manager: GPUManager for resolution handling
+            outputs_dir: Absolute path to outputs directory (for avoiding permission issues)
         """
         self.ssh = ssh_manager
         self.model_manager = model_manager
         self.gpu_manager = gpu_manager or GPUManager(ssh_manager)
+        self.outputs_dir = outputs_dir
     
     def generate_video(
         self,
@@ -440,7 +443,7 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback("\n📥 Downloading video...")
         
         import tempfile
-        local_path = tempfile.mktemp(suffix="_i2v.mp4", dir="outputs")
+        local_path = tempfile.mktemp(suffix="_i2v.mp4", dir=self.outputs_dir if self.outputs_dir else "outputs")
         if not self.ssh.download_file(remote_path, local_path):
             return None, "❌ Failed to download I2V video"
         
@@ -537,7 +540,7 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback("\n📥 Downloading video...")
         
         import tempfile
-        local_path = tempfile.mktemp(suffix="_s2v.mp4", dir="outputs")
+        local_path = tempfile.mktemp(suffix="_s2v.mp4", dir=self.outputs_dir if self.outputs_dir else "outputs")
         if not self.ssh.download_file("/root/Wan2.2/output_s2v.mp4", local_path):
             return None, "❌ Failed to download S2V video"
         
