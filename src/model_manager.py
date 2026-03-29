@@ -268,12 +268,8 @@ EOF
                 progress_callback(f"✅ Model {model_key} downloaded successfully!")
             return True
         else:
-            if progress_callback:
-                progress_callback(f"❌ Download completed but model validation failed at {model_path}")
-                progress_callback(f"   This may mean the model files are in a subdirectory or have different names")
-                progress_callback(f"   Attempting to find and reorganize model files...")
-            
-            # Try to find model files in subdirectories
+            # Try to validate with detailed diagnostics (silently)
+            # Only show errors if validation actually fails
             return self._reorganize_model_files(model_key, model_path, progress_callback)
     
     def _reorganize_model_files(self, model_key: str, model_path: str, progress_callback: Optional[Callable[[str], None]] = None) -> bool:

@@ -1434,7 +1434,8 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                             interactive=False,
                             lines=8,
                             elem_classes=["status-box"],
-                            max_lines=8
+                            max_lines=8,
+                            show_copy_button=True
                         )
                 
                 # Event handlers - update resolution choices when model changes
