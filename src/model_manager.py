@@ -57,19 +57,22 @@ class ModelManager:
         
         # Wan2.2 models have a specific structure with these key files/directories:
         # - diffusion_pytorch_model*.safetensors (in subdirectories)
-        # - Wan2.1_VAE.pth (VAE weights)
+        # - Wan2.1_VAE.pth (VAE weights) - not required for TI2V-5B
         # - models_t5_umt5-xxl-enc-bf16.pth (T5 encoder)
         # - high_noise_model/ and low_noise_model/ directories
         
         # Check for key indicators of a complete Wan2.2 model download
         validation_checks = [
-            # Check for VAE file (common across all models)
-            f"test -f {model_path}/Wan2.1_VAE.pth",
-            # Check for T5 encoder
+            # Check for T5 encoder (common to all models)
             f"test -f {model_path}/models_t5_umt5-xxl-enc-bf16.pth",
-            # Check for model directories with actual weights
-            f"test -d {model_path}/high_noise_model || test -d {model_path}/t2v_14B",
         ]
+        
+        # TI2V-5B doesn't require separate VAE file, other models do
+        if model_key != 'ti2v-5b':
+            validation_checks.append(f"test -f {model_path}/Wan2.1_VAE.pth")
+        
+        # Check for model weight directories
+        validation_checks.append(f"test -d {model_path}/high_noise_model || test -d {model_path}/low_noise_model || test -d {model_path}/t2v_14B")
         
         try:
             # Run all checks
@@ -298,7 +301,7 @@ EOF
             has_t5 = False
             has_safetensors = False
             
-            # Check VAE
+            # Check VAE (not required for TI2V-5B)
             vae_cmd = f"test -f {model_path}/Wan2.1_VAE.pth && stat -c%s {model_path}/Wan2.1_VAE.pth"
             exit_code, stdout, _ = self.ssh.execute_command(vae_cmd, timeout=5)
             if exit_code == 0 and stdout.strip():
@@ -306,6 +309,11 @@ EOF
                 has_vae = vae_size > 400000000  # > 400MB
                 if progress_callback:
                     progress_callback(f"   VAE: {'✓' if has_vae else '✗'} ({vae_size // 1000000}MB)")
+            elif model_key == 'ti2v-5b':
+                # TI2V-5B doesn't need separate VAE file
+                has_vae = True
+                if progress_callback:
+                    progress_callback(f"   VAE: ✓ (integrated in model)")
             
             # Check T5
             t5_cmd = f"test -f {model_path}/models_t5_umt5-xxl-enc-bf16.pth && stat -c%s {model_path}/models_t5_umt5-xxl-enc-bf16.pth"
@@ -326,7 +334,10 @@ EOF
                     progress_callback(f"   Safetensors: {'✓' if has_safetensors else '✗'} ({safetensors_count} files)")
             
             # Determine if model is complete
-            if has_vae and has_t5 and has_safetensors:
+            # TI2V-5B doesn't need separate VAE file
+            vae_required = has_vae if model_key != 'ti2v-5b' else True
+            
+            if vae_required and has_t5 and has_safetensors:
                 if progress_callback:
                     progress_callback(f"✅ Model {model_key} structure is complete!")
                 return True
@@ -334,7 +345,7 @@ EOF
             # Model is incomplete - explain what's missing
             if progress_callback:
                 missing = []
-                if not has_vae:
+                if not vae_required and model_key != 'ti2v-5b':
                     missing.append("VAE weights")
                 if not has_t5:
                     missing.append("T5 encoder")
