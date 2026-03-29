@@ -1,6 +1,6 @@
 {
   "productName": "Wan2.2 Video Generator",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "identifier": "com.wan2p2.videogenerator",
   "build": {
     "beforeDevCommand": "echo 'Dev mode'",

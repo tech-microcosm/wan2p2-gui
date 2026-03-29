@@ -1,6 +1,6 @@
 [package]
 name = "wan2p2-gui"
-version = "0.1.0"
+version = "0.1.3"
 description = "Wan2.2 Video Generator Desktop Application"
 authors = ["Wan2.2 Contributors"]
 edition = "2021"

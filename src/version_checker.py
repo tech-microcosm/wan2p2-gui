@@ -5,7 +5,7 @@ from packaging import version
 from typing import Optional, Tuple
 
 # Current app version - update this with each release
-CURRENT_VERSION = "0.1.2"
+CURRENT_VERSION = "0.1.3"
 
 def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
     """
