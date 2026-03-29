@@ -5,3 +5,4 @@ tqdm>=4.66.1
 PyInstaller>=6.3.0
 runpod>=1.7.0
 requests>=2.31.0
+packaging>=23.0

@@ -443,7 +443,13 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback("\n📥 Downloading video...")
         
         import tempfile
-        local_path = tempfile.mktemp(suffix="_i2v.mp4", dir=self.outputs_dir if self.outputs_dir else "outputs")
+        from pathlib import Path
+        
+        # Ensure outputs directory exists
+        outputs_path = Path(self.outputs_dir) if self.outputs_dir else Path("outputs")
+        outputs_path.mkdir(parents=True, exist_ok=True)
+        
+        local_path = tempfile.mktemp(suffix="_i2v.mp4", dir=str(outputs_path))
         if not self.ssh.download_file(remote_path, local_path):
             return None, "❌ Failed to download I2V video"
         
@@ -540,7 +546,13 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             progress_callback("\n📥 Downloading video...")
         
         import tempfile
-        local_path = tempfile.mktemp(suffix="_s2v.mp4", dir=self.outputs_dir if self.outputs_dir else "outputs")
+        from pathlib import Path
+        
+        # Ensure outputs directory exists
+        outputs_path = Path(self.outputs_dir) if self.outputs_dir else Path("outputs")
+        outputs_path.mkdir(parents=True, exist_ok=True)
+        
+        local_path = tempfile.mktemp(suffix="_s2v.mp4", dir=str(outputs_path))
         if not self.ssh.download_file("/root/Wan2.2/output_s2v.mp4", local_path):
             return None, "❌ Failed to download S2V video"
         

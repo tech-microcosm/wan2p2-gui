@@ -44,7 +44,15 @@
     ],
     "windows": {
       "wix": {
-        "upgradeCode": "3C3E9F4A-8B7D-4E2A-9F1C-6D5E8A7B9C4D"
+        "upgradeCode": "3C3E9F4A-8B7D-4E2A-9F1C-6D5E8A7B9C4D",
+        "template": "wix/main.wxs",
+        "fragmentPaths": [],
+        "componentRefs": [],
+        "featureRefs": [],
+        "mergeRefs": [],
+        "enableElevatedUpdateDialog": true,
+        "bannerPath": null,
+        "dialogImagePath": null
       }
     }
   }

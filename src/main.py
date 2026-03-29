@@ -33,6 +33,7 @@ from .ssh_key_manager import SSHKeyManager
 from .config_manager import ConfigManager
 from .gpu_manager import GPUManager
 from .model_manager import ModelManager
+from .version_checker import check_for_updates, get_current_version
 from .setup_manager import SetupManager
 from .video_generator import VideoGenerator
 from .runpod_manager import RunPodManager
@@ -1012,12 +1013,30 @@ def create_ui():
     
     with gr.Blocks(title="Wan2.2 Video Generator") as app:
         
+        # Check for updates on startup
+        update_available, latest_version, download_url = check_for_updates()
+        
+        # Update notification banner
+        if update_available and download_url:
+            with gr.Row():
+                gr.Markdown(f"""
+### 🎉 Update Available: v{latest_version}
+
+A new version is available! [**Download v{latest_version}**]({download_url})
+
+**Current version:** v{get_current_version()} | **Latest version:** v{latest_version}
+
+📥 Download the new installer and run it to upgrade. Your settings and outputs will be preserved.
+                """, elem_classes="update-banner")
+        
         with gr.Row():
             with gr.Column(scale=4):
-                gr.Markdown("""
+                gr.Markdown(f"""
 # 🎬 Wan2.2 Video Generator
 
 Generate high-quality AI videos using Wan2.2 models on RunPod GPU pods.
+
+**Version:** v{get_current_version()}
                 """)
             with gr.Column(scale=1):
                 app_runtime = gr.Markdown(f"🕐 App Runtime: 0s", elem_id="app-runtime")
