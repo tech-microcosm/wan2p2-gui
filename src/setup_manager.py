@@ -88,11 +88,12 @@ class SetupManager:
                 if [ -f "RIFE_HDv3.py" ]; then
                     echo "RIFE model already downloaded"
                 else
+                    apt-get update && apt-get install -y unzip
                     pip install --break-system-packages gdown
                     gdown 'https://drive.google.com/uc?id=1APIzVeI-4ZZCEuIRE1m6WYfSCaOsi_7_' -O v3.8.zip
                     unzip -o v3.8.zip
                     mv train_log/* . 2>/dev/null || true
-                    rm -rf train_log v3.8.zip
+                    rm -rf train_log __MACOSX v3.8.zip
                 fi
             ''',
             'timeout': 300,
