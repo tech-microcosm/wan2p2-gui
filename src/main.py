@@ -12,6 +12,7 @@ import glob
 import shutil
 import threading
 import tempfile
+import inspect
 from typing import Optional, Tuple, Generator, List
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1429,14 +1430,19 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                             scale=1
                         )
                         
-                        generation_status = gr.Textbox(
-                            label="Status",
-                            interactive=False,
-                            lines=8,
-                            elem_classes=["status-box"],
-                            max_lines=8,
-                            show_copy_button=True
-                        )
+                        generation_status_kwargs = {
+                            "label": "Status",
+                            "interactive": True,
+                            "lines": 8,
+                            "elem_classes": ["status-box"],
+                            "max_lines": 8,
+                        }
+
+                        # Compatibility across Gradio versions used by local/dev vs installer builds.
+                        if "show_copy_button" in inspect.signature(gr.Textbox.__init__).parameters:
+                            generation_status_kwargs["show_copy_button"] = True
+
+                        generation_status = gr.Textbox(**generation_status_kwargs)
                 
                 # Event handlers - update resolution choices when model changes
                 def update_resolution_for_model(model_key):
