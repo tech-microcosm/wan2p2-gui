@@ -982,21 +982,36 @@ def generate_video_wrapper(
         video_path = result[0]
         frame_path = None
         if video_path:
-            video_path, frame_path = save_video_to_outputs(video_path, save_last_frame)
-            final_status += f"\n\n📁 Saved to: {video_path}"
-            if frame_path:
-                final_status += f"\n📸 Last frame saved: {frame_path}"
+            try:
+                progress_callback(f"\n💾 Saving video to outputs directory...")
+                progress_callback(f"   Source: {video_path}")
+                progress_callback(f"   Destination: {OUTPUTS_DIR}")
+                
+                video_path, frame_path = save_video_to_outputs(video_path, save_last_frame)
+                final_status += f"\n\n📁 Saved to: {video_path}"
+                if frame_path:
+                    final_status += f"\n📸 Last frame saved: {frame_path}"
+            except Exception as save_error:
+                import traceback
+                save_traceback = traceback.format_exc()
+                final_status += f"\n\n⚠️ Video generated but save failed: {str(save_error)}"
+                final_status += f"\n\nSave error details:\n{save_traceback}"
+                progress_callback(f"\n⚠️ Save error: {str(save_error)}")
+                progress_callback(f"\nTraceback:\n{save_traceback}")
         
         # Save to history
-        app_state.config_manager.save_generation_history(
-            prompt=prompt,
-            model=model,
-            duration=int(duration),
-            resolution=resolution,
-            seed=int(seed),
-            output_path=video_path,
-            success=video_path is not None
-        )
+        try:
+            app_state.config_manager.save_generation_history(
+                prompt=prompt,
+                model=model,
+                duration=int(duration),
+                resolution=resolution,
+                seed=int(seed),
+                output_path=video_path if video_path else "unknown",
+                success=video_path is not None
+            )
+        except Exception as history_error:
+            progress_callback(f"\n⚠️ History save failed: {str(history_error)}")
         
         yield video_path, final_status
         
