@@ -895,11 +895,10 @@ def generate_video_wrapper(
     rife_multiplier: int,
     sample_steps: int = 20,
     enable_tiling: bool = False,
-    save_last_frame: bool = False,
     input_image: Optional[str] = None,
     input_audio: Optional[str] = None
 ) -> Generator[Tuple[Optional[str], str], None, None]:
-    """Generate video with the given parameters."""
+    """Generate video with the given parameters. User downloads via Gradio's built-in download button."""
     
     # Validate connection
     if not app_state.connected or not app_state.video_generator:
@@ -978,26 +977,11 @@ def generate_video_wrapper(
         if result[1]:
             final_status += f"\n\n{result[1]}"
         
-        # Save video to local outputs directory
+        # Return video path for display - user can download via Gradio's download button
         video_path = result[0]
-        frame_path = None
+        
         if video_path:
-            try:
-                progress_callback(f"\n💾 Saving video to outputs directory...")
-                progress_callback(f"   Source: {video_path}")
-                progress_callback(f"   Destination: {OUTPUTS_DIR}")
-                
-                video_path, frame_path = save_video_to_outputs(video_path, save_last_frame)
-                final_status += f"\n\n📁 Saved to: {video_path}"
-                if frame_path:
-                    final_status += f"\n📸 Last frame saved: {frame_path}"
-            except Exception as save_error:
-                import traceback
-                save_traceback = traceback.format_exc()
-                final_status += f"\n\n⚠️ Video generated but save failed: {str(save_error)}"
-                final_status += f"\n\nSave error details:\n{save_traceback}"
-                progress_callback(f"\n⚠️ Save error: {str(save_error)}")
-                progress_callback(f"\nTraceback:\n{save_traceback}")
+            final_status += f"\n\n✅ Video ready! Use the download button (⬇️) above to save it to your preferred location."
         
         # Save to history
         try:
@@ -1007,11 +991,12 @@ def generate_video_wrapper(
                 duration=int(duration),
                 resolution=resolution,
                 seed=int(seed),
-                output_path=video_path if video_path else "unknown",
+                output_path=video_path if video_path else "N/A",
                 success=video_path is not None
             )
         except Exception as history_error:
-            progress_callback(f"\n⚠️ History save failed: {str(history_error)}")
+            # Silent fail on history - not critical
+            pass
         
         yield video_path, final_status
         
@@ -1411,12 +1396,6 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                             value=False,
                             visible=False
                         )
-                        save_last_frame = gr.Checkbox(
-                            label="Save Last Frame as Image",
-                            value=False,
-                            visible=False
-                        )
-                        time_estimate = gr.Markdown("", visible=False)
                         
                         with gr.Row():
                             generate_btn = gr.Button(
@@ -1426,12 +1405,6 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                                 scale=2
                             )
                             clear_btn = gr.Button("🔄 Clear", variant="secondary", scale=1)
-                        
-                        save_last_frame_checkbox = gr.Checkbox(
-                            label="Save Last Frame",
-                            value=False,
-                            info="Saves the final frame as an image for use with I2V model"
-                        )
                     
                     # RIGHT COLUMN: Output
                     with gr.Column(scale=1, min_width=400):
@@ -1512,7 +1485,7 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                 
                 generate_btn.click(
                     fn=generate_video_wrapper,
-                    inputs=[prompt, duration, model, resolution, seed, enhance_prompt, rife_multiplier, sample_steps, enable_tiling, save_last_frame_checkbox, input_image, input_audio],
+                    inputs=[prompt, duration, model, resolution, seed, enhance_prompt, rife_multiplier, sample_steps, enable_tiling, input_image, input_audio],
                     outputs=[output_video, generation_status]
                 )
                 
