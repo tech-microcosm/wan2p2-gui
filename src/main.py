@@ -1592,8 +1592,7 @@ Browse and download generated content from your GPU pod. This includes videos, l
                 """)
                 
                 with gr.Row():
-                    refresh_btn = gr.Button("🔄 Refresh Pod Files", variant="secondary")
-                    download_instructions_btn = gr.Button("� Download Instructions", variant="secondary")
+                    refresh_btn = gr.Button("🔄 Refresh Pod Files", variant="primary")
                 
                 outputs_status = gr.Markdown("Click 'Refresh' to load outputs")
                 
@@ -1619,88 +1618,62 @@ Browse and download generated content from your GPU pod. This includes videos, l
                         gr.Markdown("*Images saved with 'Save Last Frame' option can be used as reference for I2V model*")
                 
                 def refresh_pod_storage():
-                    """Browse files in pod temporary storage (/root/Wan2.2 and temp directories)."""
+                    """Download files from pod storage to local temp for display with download buttons."""
                     if not app_state.connected or not app_state.ssh_manager:
                         return [], [], "❌ Not connected to pod. Please connect first."
                     
                     try:
                         # List files in Wan2.2 directory
                         exit_code, stdout, stderr = app_state.ssh_manager.execute_command(
-                            "ls -lh /root/Wan2.2/*.mp4 /root/Wan2.2/*.png 2>/dev/null | tail -20",
+                            "ls -1 /root/Wan2.2/*.mp4 /root/Wan2.2/*.png 2>/dev/null | tail -30",
                             timeout=10
                         )
                         
-                        if exit_code != 0:
+                        if exit_code != 0 or not stdout.strip():
                             return [], [], f"⚠️ No files found in pod storage"
                         
-                        # Parse file list
-                        videos = []
-                        images = []
+                        # Parse file list and download to local temp
+                        import tempfile
+                        temp_dir = tempfile.gettempdir()
+                        pod_storage_dir = os.path.join(temp_dir, "wan2_pod_storage")
+                        os.makedirs(pod_storage_dir, exist_ok=True)
+                        
+                        video_paths = []
+                        image_paths = []
+                        downloaded_count = 0
                         
                         for line in stdout.strip().split('\n'):
-                            if not line or line.startswith('total'):
+                            if not line.strip():
                                 continue
                             
-                            parts = line.split()
-                            if len(parts) < 9:
+                            remote_path = line.strip()
+                            filename = os.path.basename(remote_path)
+                            local_path = os.path.join(pod_storage_dir, filename)
+                            
+                            # Download file from pod
+                            try:
+                                success = app_state.ssh_manager.download_file(remote_path, local_path)
+                                if success and os.path.exists(local_path):
+                                    if filename.endswith('.mp4'):
+                                        video_paths.append(local_path)
+                                    elif filename.endswith('.png'):
+                                        image_paths.append(local_path)
+                                    downloaded_count += 1
+                            except Exception as e:
+                                print(f"Failed to download {filename}: {e}")
                                 continue
-                            
-                            filename = parts[-1]
-                            filesize = parts[4]
-                            
-                            if filename.endswith('.mp4'):
-                                videos.append(f"{os.path.basename(filename)} ({filesize})")
-                            elif filename.endswith('.png'):
-                                images.append(f"{os.path.basename(filename)} ({filesize})")
                         
-                        status = f"✅ Found {len(videos)} videos and {len(images)} images in pod storage"
-                        return videos, images, status
+                        status = f"✅ Downloaded {downloaded_count} files from pod ({len(video_paths)} videos, {len(image_paths)} images)\n\n💡 Click on any file to view, use the download button (⬇️) to save to your preferred location."
+                        return video_paths, image_paths, status
                         
                     except Exception as e:
-                        return [], [], f"❌ Error browsing pod storage: {str(e)}"
-                
-                def download_pod_file():
-                    """Instructions for downloading files from pod."""
-                    if not app_state.connected:
-                        return "❌ Not connected to pod"
-                    
-                    pod_info = app_state.ssh_manager.get_connection_info() if app_state.ssh_manager else {}
-                    host = pod_info.get('host', 'unknown')
-                    port = pod_info.get('port', 22)
-                    
-                    instructions = f"""
-📥 **How to Download Files from Pod**
-
-**Pod Connection:** `{host}:{port}`
-**Pod Directory:** `/root/Wan2.2/`
-
-**Method 1: Using SCP (Recommended)**
-```bash
-scp -P {port} root@{host}:/root/Wan2.2/output_*.mp4 ./
-scp -P {port} root@{host}:/root/Wan2.2/*_last_frame.png ./
-```
-
-**Method 2: Using SFTP Client**
-- Use FileZilla, WinSCP, or similar
-- Host: {host}, Port: {port}
-- Navigate to `/root/Wan2.2/`
-- Download desired files
-
-**Common Files:**
-- `output_2s.mp4`, `output_5s.mp4` - Generated videos
-- `*_last_frame.png` - Saved last frames for I2V
-- `output_raw.mp4` - Raw video before interpolation
-"""
-                    return instructions
+                        import traceback
+                        error_details = traceback.format_exc()
+                        return [], [], f"❌ Error downloading from pod storage: {str(e)}\n\n{error_details}"
                 
                 refresh_btn.click(
                     fn=refresh_pod_storage,
                     outputs=[video_gallery, image_gallery, outputs_status]
-                )
-                
-                download_instructions_btn.click(
-                    fn=download_pod_file,
-                    outputs=[outputs_status]
                 )
                 
                 # Select video from gallery
