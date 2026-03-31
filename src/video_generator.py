@@ -1012,17 +1012,16 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
             progress_callback(f"   ✅ {line}")
     
     def cleanup_remote_files(self, progress_callback: Optional[Callable[[str], None]] = None) -> bool:
-        """Clean up temporary files on remote pod."""
+        """Clean up intermediate/temporary files on remote pod. Preserves final videos and last frame images."""
         if progress_callback:
-            progress_callback("🧹 Cleaning up temporary files...")
+            progress_callback("🧹 Cleaning up intermediate files...")
         
+        # Only delete intermediate files, NOT final outputs (output_5s.mp4, video_10s.mp4, last_frame*.png)
         cleanup_cmd = """cd /root/Wan2.2 && rm -f \\
     output_raw.mp4 \\
-    output_2s.mp4 output_5s.mp4 \\
+    output_2s.mp4 \\
     segment1_raw.mp4 segment1_interp.mp4 \\
     segment2_raw.mp4 segment2_interp.mp4 \\
-    last_frame.png \\
-    video_10s.mp4 \\
     filelist.txt
 """
         
@@ -1030,7 +1029,7 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
         
         if progress_callback:
             if exit_code == 0:
-                progress_callback("✅ Cleanup complete")
+                progress_callback("✅ Cleanup complete (final videos preserved)")
             else:
                 progress_callback("⚠️ Some files could not be cleaned up")
         
