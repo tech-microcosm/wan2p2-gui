@@ -1047,7 +1047,6 @@ You can stop this generation and try again with a smaller model or higher specs 
                     else:
                         remote_video = stdout.strip()
                         # Generate timestamp for frame filename
-                        import time
                         timestamp = int(time.time())
                         remote_frame = f"/root/Wan2.2/last_frame_{int(duration)}s_{timestamp}.png"
                         
