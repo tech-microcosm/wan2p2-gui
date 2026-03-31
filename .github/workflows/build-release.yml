@@ -59,14 +59,20 @@ jobs:
           NO_STRIP: true
         run: npm run build
 
-      - name: Upload artifacts to release
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-builds
+          path: src-tauri/target/release/bundle/deb/*.deb
+
+      - name: Upload to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
             src-tauri/target/release/bundle/deb/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
   build-windows:
     runs-on: windows-latest
@@ -119,14 +125,20 @@ jobs:
         working-directory: src-tauri
         run: npm run build
 
-      - name: Upload artifacts to release
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-builds
+          path: src-tauri/target/release/bundle/msi/*.msi
+
+      - name: Upload to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
             src-tauri/target/release/bundle/msi/*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
   build-macos:
     runs-on: macos-latest
@@ -172,11 +184,17 @@ jobs:
         working-directory: src-tauri
         run: npm run build
 
-      - name: Upload artifacts to release
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-builds
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Upload to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
