@@ -961,13 +961,45 @@ def generate_video_wrapper(
         
         # Yield progress updates while generation is running
         last_msg_count = 0
+        last_progress_time = generation_start
+        stuck_warning_shown = False
+        
         while thread.is_alive():
             elapsed = int(time.time() - generation_start)
             elapsed_str = f"{elapsed // 60}m {elapsed % 60}s" if elapsed >= 60 else f"{elapsed}s"
             
+            # Check if progress is stuck (no new messages for 2+ minutes)
+            current_msg_count = len(progress_messages)
+            if current_msg_count > last_msg_count:
+                last_progress_time = time.time()
+                stuck_warning_shown = False
+            
+            time_since_last_progress = time.time() - last_progress_time
+            
+            # Warn if stuck for 2+ minutes
+            if time_since_last_progress >= 120 and not stuck_warning_shown and current_msg_count > 0:
+                warning_msg = f"""
+⚠️ WARNING: No progress for {int(time_since_last_progress // 60)} minutes!
+
+Possible causes:
+• RAM OOM (Out of Memory) - Pod may run out of system RAM
+• VRAM OOM - GPU memory exhausted
+• Model loading taking longer than expected
+
+Recommendations:
+• Wait 2-3 more minutes to see if progress resumes
+• If still stuck, terminate the generation and restart
+• For T2V-A14B: Use pod with 60GB+ VRAM and 70GB+ RAM
+• Consider using TI2V-5B instead (works on 24GB+ VRAM, 32GB+ RAM)
+
+You can stop this generation and try again with a smaller model or higher specs pod.
+"""
+                progress_callback(warning_msg)
+                stuck_warning_shown = True
+            
             status_text = f"⏱️ Elapsed: {elapsed_str}\n\n" + "\n".join(progress_messages)
             yield None, status_text
-            last_msg_count = len(progress_messages)
+            last_msg_count = current_msg_count
             thread.join(timeout=1.0)
         
         # Final status with total time
@@ -1550,16 +1582,18 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                     outputs=[output_video, generation_status, prompt]
                 )
             
-            # ===== LOCAL OUTPUTS TAB =====
-            with gr.Tab("📁 Local Outputs"):
+            # ===== POD STORAGE TAB =====
+            with gr.Tab("� Pod Storage"):
                 gr.Markdown("""
-### Generated Content
-Browse and download your generated videos and images. Videos are automatically saved to the `outputs/` folder.
+### Pod Temporary Files
+Browse and download generated content from your GPU pod. This includes videos, last frame images, and intermediate files.
+
+**Note:** Files are stored temporarily on the pod. Download important files to your local machine.
                 """)
                 
                 with gr.Row():
-                    refresh_btn = gr.Button("🔄 Refresh", variant="secondary")
-                    open_folder_btn = gr.Button("📂 Open Folder", variant="secondary")
+                    refresh_btn = gr.Button("🔄 Refresh Pod Files", variant="secondary")
+                    download_instructions_btn = gr.Button("� Download Instructions", variant="secondary")
                 
                 outputs_status = gr.Markdown("Click 'Refresh' to load outputs")
                 
@@ -1584,30 +1618,88 @@ Browse and download your generated videos and images. Videos are automatically s
                         )
                         gr.Markdown("*Images saved with 'Save Last Frame' option can be used as reference for I2V model*")
                 
-                def refresh_gallery():
-                    videos, images, status = refresh_outputs_gallery()
-                    # For video gallery, we need to return video thumbnails/paths
-                    return videos, images, status
+                def refresh_pod_storage():
+                    """Browse files in pod temporary storage (/root/Wan2.2 and temp directories)."""
+                    if not app_state.connected or not app_state.ssh_manager:
+                        return [], [], "❌ Not connected to pod. Please connect first."
+                    
+                    try:
+                        # List files in Wan2.2 directory
+                        exit_code, stdout, stderr = app_state.ssh_manager.execute_command(
+                            "ls -lh /root/Wan2.2/*.mp4 /root/Wan2.2/*.png 2>/dev/null | tail -20",
+                            timeout=10
+                        )
+                        
+                        if exit_code != 0:
+                            return [], [], f"⚠️ No files found in pod storage"
+                        
+                        # Parse file list
+                        videos = []
+                        images = []
+                        
+                        for line in stdout.strip().split('\n'):
+                            if not line or line.startswith('total'):
+                                continue
+                            
+                            parts = line.split()
+                            if len(parts) < 9:
+                                continue
+                            
+                            filename = parts[-1]
+                            filesize = parts[4]
+                            
+                            if filename.endswith('.mp4'):
+                                videos.append(f"{os.path.basename(filename)} ({filesize})")
+                            elif filename.endswith('.png'):
+                                images.append(f"{os.path.basename(filename)} ({filesize})")
+                        
+                        status = f"✅ Found {len(videos)} videos and {len(images)} images in pod storage"
+                        return videos, images, status
+                        
+                    except Exception as e:
+                        return [], [], f"❌ Error browsing pod storage: {str(e)}"
                 
-                def open_outputs_folder():
-                    import subprocess
-                    import platform
-                    folder = str(OUTPUTS_DIR)
-                    if platform.system() == 'Darwin':  # macOS
-                        subprocess.run(['open', folder])
-                    elif platform.system() == 'Windows':
-                        subprocess.run(['explorer', folder])
-                    else:  # Linux
-                        subprocess.run(['xdg-open', folder])
-                    return f"📂 Opened: {folder}"
+                def download_pod_file():
+                    """Instructions for downloading files from pod."""
+                    if not app_state.connected:
+                        return "❌ Not connected to pod"
+                    
+                    pod_info = app_state.ssh_manager.get_connection_info() if app_state.ssh_manager else {}
+                    host = pod_info.get('host', 'unknown')
+                    port = pod_info.get('port', 22)
+                    
+                    instructions = f"""
+📥 **How to Download Files from Pod**
+
+**Pod Connection:** `{host}:{port}`
+**Pod Directory:** `/root/Wan2.2/`
+
+**Method 1: Using SCP (Recommended)**
+```bash
+scp -P {port} root@{host}:/root/Wan2.2/output_*.mp4 ./
+scp -P {port} root@{host}:/root/Wan2.2/*_last_frame.png ./
+```
+
+**Method 2: Using SFTP Client**
+- Use FileZilla, WinSCP, or similar
+- Host: {host}, Port: {port}
+- Navigate to `/root/Wan2.2/`
+- Download desired files
+
+**Common Files:**
+- `output_2s.mp4`, `output_5s.mp4` - Generated videos
+- `*_last_frame.png` - Saved last frames for I2V
+- `output_raw.mp4` - Raw video before interpolation
+"""
+                    return instructions
                 
                 refresh_btn.click(
-                    fn=refresh_gallery,
+                    fn=refresh_pod_storage,
                     outputs=[video_gallery, image_gallery, outputs_status]
                 )
                 
-                open_folder_btn.click(
-                    fn=open_outputs_folder,
+                download_instructions_btn.click(
+                    fn=download_pod_file,
                     outputs=[outputs_status]
                 )
                 

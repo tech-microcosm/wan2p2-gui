@@ -35,8 +35,10 @@ class GPUManager:
             'name': 'T2V-A14B (High Quality)',
             'task_name': 't2v-A14B',
             'hf_repo': 'Wan-AI/Wan2.2-T2V-A14B',
-            'vram_min': 40,
+            'vram_min': 60,
             'vram_optimal': 80,
+            'vram_actual_requirement': 60,
+            'ram_min': 70,
             'file_size_gb': 27,
             'download_time_min': 12,
             'speed_2s': '~3 min',
@@ -45,9 +47,10 @@ class GPUManager:
             'quality': 'Excellent',
             'supports_t2v': True,
             'supports_i2v': False,
-            'description': 'High quality text-to-video. Best for final renders.',
+            'description': 'High quality text-to-video. Requires 60GB+ VRAM and 70GB+ RAM. Best for final renders.',
+            'oom_warning': 'T2V-A14B requires 60GB+ VRAM and 70GB+ RAM. Frequently causes OOM on 48GB VRAM / 62GB RAM configurations.',
             'resolutions': {
-                40: ['480P'],
+                60: ['480P'],
                 80: ['480P', '720P', '1080P']
             }
         },

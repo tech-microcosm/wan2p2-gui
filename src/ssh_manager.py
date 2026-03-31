@@ -274,6 +274,15 @@ class SSHManager:
         exit_code, _, _ = self.execute_command(f"test -d {remote_path}")
         return exit_code == 0
     
+    def get_connection_info(self) -> dict:
+        """Get connection information for display."""
+        return {
+            'host': self.host,
+            'port': self.port,
+            'username': self.username,
+            'key_path': self.key_path
+        }
+    
     def close(self):
         """Close SSH connection."""
         with self._lock:
