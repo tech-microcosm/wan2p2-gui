@@ -1635,6 +1635,8 @@ Browse and download generated content from your GPU pod. This includes videos, l
                             height=120,
                             object_fit="cover",
                             allow_preview=False,
+                            interactive=False,
+                            show_label=True,
                             elem_id="pod-video-gallery"
                         )
                         video_preview = gr.Video(
@@ -1651,6 +1653,8 @@ Browse and download generated content from your GPU pod. This includes videos, l
                             height=120,
                             object_fit="cover",
                             allow_preview=False,
+                            interactive=False,
+                            show_label=True,
                             elem_id="pod-image-gallery"
                         )
                         image_preview = gr.Image(
@@ -1869,6 +1873,10 @@ def main():
             #pod-video-gallery img, #pod-video-gallery video { max-height: 100px !important; object-fit: contain !important; }
             #pod-image-gallery .thumbnail-item { max-height: 120px !important; }
             #pod-image-gallery img { max-height: 100px !important; object-fit: contain !important; }
+            #pod-video-gallery button[aria-label="Remove Image"], #pod-video-gallery .upload-container { display: none !important; }
+            #pod-image-gallery button[aria-label="Remove Image"], #pod-image-gallery .upload-container { display: none !important; }
+            #pod-video-gallery .grid-wrap { pointer-events: auto !important; }
+            #pod-image-gallery .grid-wrap { pointer-events: auto !important; }
         """
     )
 
