@@ -75,24 +75,26 @@ class ModelManager:
         validation_checks.append(f"test -d {model_path}/high_noise_model || test -d {model_path}/low_noise_model || test -d {model_path}/t2v_14B")
         
         try:
-            # Run all checks
+            # Run validation checks - all must pass
             for check_cmd in validation_checks:
                 exit_code, stdout, stderr = self.ssh.execute_command(check_cmd, timeout=5)
                 if exit_code != 0:
                     return False
             
-            # Additional check: verify at least one large safetensors file exists (>100MB)
-            find_cmd = f"find {model_path} -name '*.safetensors' -size +100M 2>/dev/null | head -1"
+            # If basic structure exists, verify we have actual model weight files
+            # Check for safetensors files (any size - some models have smaller files)
+            find_cmd = f"find {model_path} -name '*.safetensors' 2>/dev/null | head -1"
             exit_code, stdout, stderr = self.ssh.execute_command(find_cmd, timeout=10)
             if exit_code == 0 and stdout.strip():
                 return True
             
-            # Alternative: check for .pth files > 100MB (some models use .pth)
-            find_pth_cmd = f"find {model_path} -name '*.pth' -size +100M 2>/dev/null | head -1"
+            # Alternative: check for .pth files (any size)
+            find_pth_cmd = f"find {model_path} -name '*.pth' 2>/dev/null | head -1"
             exit_code, stdout, stderr = self.ssh.execute_command(find_pth_cmd, timeout=10)
             if exit_code == 0 and stdout.strip():
                 return True
-                
+            
+            # If directory structure exists but no weight files found, still consider it incomplete
             return False
             
         except Exception:
