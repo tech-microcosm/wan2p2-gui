@@ -963,6 +963,7 @@ def generate_video_wrapper(
         last_msg_count = 0
         last_progress_time = generation_start
         stuck_warning_shown = False
+        generation_complete = False  # Track if 100% reached
         
         while thread.is_alive():
             elapsed = int(time.time() - generation_start)
@@ -973,11 +974,23 @@ def generate_video_wrapper(
             if current_msg_count > last_msg_count:
                 last_progress_time = time.time()
                 stuck_warning_shown = False
+                # Check if 100% or completion reached
+                latest_msgs = ' '.join(progress_messages[-5:]) if progress_messages else ''
+                if '100%' in latest_msgs or 'Generation complete' in latest_msgs or 'complete!' in latest_msgs:
+                    generation_complete = True
             
             time_since_last_progress = time.time() - last_progress_time
             
-            # Warn if stuck for 2+ minutes
-            if time_since_last_progress >= 120 and not stuck_warning_shown and current_msg_count > 0:
+            # Warn if stuck for 2+ minutes (but NOT after 100% reached)
+            if time_since_last_progress >= 120 and not stuck_warning_shown and current_msg_count > 0 and not generation_complete:
+                # Model-specific warning message
+                if model in ['t2v-a14b']:
+                    model_advice = "• For T2V-A14B: Use pod with 60GB+ VRAM and 70GB+ RAM"
+                elif model in ['i2v-a14b', 's2v-14b']:
+                    model_advice = f"• For {model.upper()}: Use pod with 60GB+ VRAM and 70GB+ RAM"
+                else:
+                    model_advice = "• Consider using a larger GPU if OOM persists"
+                
                 warning_msg = f"""
 ⚠️ WARNING: No progress for {int(time_since_last_progress // 60)} minutes!
 
@@ -989,8 +1002,7 @@ Possible causes:
 Recommendations:
 • Wait 2-3 more minutes to see if progress resumes
 • If still stuck, terminate the generation and restart
-• For T2V-A14B: Use pod with 60GB+ VRAM and 70GB+ RAM
-• Consider using TI2V-5B instead (works on 24GB+ VRAM, 32GB+ RAM)
+{model_advice}
 
 You can stop this generation and try again with a smaller model or higher specs pod.
 """
@@ -1019,23 +1031,28 @@ You can stop this generation and try again with a smaller model or higher specs 
             # Extract last frame if requested (for I2V workflow)
             if save_last_frame:
                 try:
-                    import subprocess
-                    frame_path = video_path.replace('.mp4', '_last_frame.png')
+                    progress_callback(f"\n📸 Extracting last frame on pod...")
                     
-                    progress_callback(f"\n📸 Extracting last frame...")
+                    # Extract frame on pod using ffmpeg (which is available there)
+                    remote_video = f"/root/Wan2.2/{os.path.basename(video_path)}"
+                    remote_frame = remote_video.replace('.mp4', '_last_frame.png')
                     
-                    # Use ffmpeg to extract last frame
-                    cmd = [
-                        'ffmpeg', '-sseof', '-0.1', '-i', video_path,
-                        '-update', '1', '-q:v', '2', '-frames:v', '1', frame_path, '-y'
-                    ]
-                    subprocess.run(cmd, capture_output=True, timeout=30, check=False)
+                    extract_cmd = f"ffmpeg -sseof -0.1 -i {remote_video} -update 1 -q:v 2 -frames:v 1 {remote_frame} -y 2>/dev/null"
+                    exit_code, stdout, stderr = app_state.ssh_manager.execute_command(extract_cmd, timeout=30)
                     
-                    if os.path.exists(frame_path):
-                        final_status += f"\n📸 Last frame saved: {os.path.basename(frame_path)}"
-                        progress_callback(f"   Saved to: {frame_path}")
+                    if exit_code == 0:
+                        # Download the frame to local temp
+                        import tempfile
+                        local_frame = os.path.join(tempfile.gettempdir(), os.path.basename(remote_frame))
+                        
+                        if app_state.ssh_manager.download_file(remote_frame, local_frame):
+                            final_status += f"\n📸 Last frame saved! Find it in Pod Storage tab or download here."
+                            progress_callback(f"   ✅ Frame extracted: {os.path.basename(remote_frame)}")
+                        else:
+                            final_status += f"\n⚠️ Frame extracted on pod but download failed. Use Pod Storage to download."
                     else:
-                        final_status += f"\n⚠️ Failed to extract last frame"
+                        final_status += f"\n⚠️ Failed to extract last frame on pod"
+                        progress_callback(f"   Error: {stderr[:100] if stderr else 'Unknown error'}")
                 except Exception as e:
                     final_status += f"\n⚠️ Frame extraction failed: {str(e)}"
         
@@ -1600,20 +1617,21 @@ Browse and download generated content from your GPU pod. This includes videos, l
                     with gr.Tab("🎬 Videos"):
                         video_gallery = gr.Gallery(
                             label="Generated Videos",
-                            columns=3,
-                            height="auto",
-                            object_fit="contain",
-                            allow_preview=True
+                            columns=4,
+                            height=200,
+                            object_fit="cover",
+                            allow_preview=True,
+                            preview=True
                         )
-                        selected_video = gr.Video(label="Selected Video")
                     
                     with gr.Tab("🖼️ Images (Last Frames)"):
                         image_gallery = gr.Gallery(
                             label="Saved Images",
-                            columns=4,
-                            height="auto",
-                            object_fit="contain",
-                            allow_preview=True
+                            columns=5,
+                            height=200,
+                            object_fit="cover",
+                            allow_preview=True,
+                            preview=True
                         )
                         gr.Markdown("*Images saved with 'Save Last Frame' option can be used as reference for I2V model*")
                 
@@ -1675,12 +1693,6 @@ Browse and download generated content from your GPU pod. This includes videos, l
                     fn=refresh_pod_storage,
                     outputs=[video_gallery, image_gallery, outputs_status]
                 )
-                
-                # Select video from gallery
-                def select_video(evt: gr.SelectData):
-                    if evt.value and 'video' in evt.value.get('mime_type', ''):
-                        return evt.value.get('path')
-                    return None
             
             # ===== HELP TAB =====
             with gr.Tab("ℹ️ Help & Guide"):

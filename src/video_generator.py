@@ -705,7 +705,7 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
         
         if progress_callback:
             progress_callback(f"\n✅ Video generated successfully!")
-            progress_callback(f"   Saved to: {local_path}")
+            progress_callback(f"   (Preview loaded from temp: {os.path.basename(local_path)})")
         
         return local_path, "✅ Video generated successfully!"
     
@@ -908,7 +908,7 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
         
         if progress_callback:
             progress_callback(f"\n✅ 10-second video generated successfully!")
-            progress_callback(f"   Saved to: {local_path}")
+            progress_callback(f"   (Preview loaded from temp: {os.path.basename(local_path)})")
         
         return local_path, "✅ 10-second video generated successfully!"
     
