@@ -1628,41 +1628,51 @@ Browse and download generated content from your GPU pod. This includes videos, l
                 with gr.Tabs():
                     with gr.Tab("🎬 Videos"):
                         video_gallery = gr.Gallery(
-                            label="Generated Videos",
-                            columns=4,
+                            label="Generated Videos (click to preview)",
+                            columns=6,
                             rows=1,
-                            height=150,
-                            object_fit="contain",
-                            allow_preview=True,
+                            height=120,
+                            object_fit="cover",
+                            allow_preview=False,
                             elem_id="pod-video-gallery"
+                        )
+                        video_preview = gr.Video(
+                            label="Video Preview",
+                            interactive=False,
+                            height=400
                         )
                     
                     with gr.Tab("🖼️ Images (Last Frames)"):
                         image_gallery = gr.Gallery(
-                            label="Saved Images",
-                            columns=5,
+                            label="Saved Images (click to preview)",
+                            columns=6,
                             rows=1,
-                            height=150,
-                            object_fit="contain",
-                            allow_preview=True,
+                            height=120,
+                            object_fit="cover",
+                            allow_preview=False,
                             elem_id="pod-image-gallery"
+                        )
+                        image_preview = gr.Image(
+                            label="Image Preview",
+                            interactive=False,
+                            height=400
                         )
                         gr.Markdown("*Images saved with 'Save Last Frame' option can be used as reference for I2V model*")
                 
                 def refresh_pod_storage():
                     """Download files from pod storage to local temp for display with download buttons."""
                     if not app_state.connected or not app_state.ssh_manager:
-                        return [], [], "❌ Not connected to pod. Please connect first."
+                        return [], [], None, None, "❌ Not connected to pod. Please connect first."
                     
                     try:
-                        # List files in Wan2.2 directory
+                        # List files - only show final videos (5s, 10s), exclude intermediate (2s, raw)
                         exit_code, stdout, stderr = app_state.ssh_manager.execute_command(
-                            "ls -1 /root/Wan2.2/*.mp4 /root/Wan2.2/*.png 2>/dev/null | tail -30",
+                            "ls -1 /root/Wan2.2/output_5s.mp4 /root/Wan2.2/output_10s.mp4 /root/Wan2.2/video_10s.mp4 /root/Wan2.2/*.png /root/Wan2.2/last_frame*.png 2>/dev/null | tail -30",
                             timeout=10
                         )
                         
                         if exit_code != 0 or not stdout.strip():
-                            return [], [], f"⚠️ No files found in pod storage"
+                            return [], [], None, None, f"⚠️ No files found in pod storage"
                         
                         # Parse file list and download to local temp
                         import tempfile
@@ -1680,6 +1690,11 @@ Browse and download generated content from your GPU pod. This includes videos, l
                             
                             remote_path = line.strip()
                             filename = os.path.basename(remote_path)
+                            
+                            # Skip intermediate files just in case
+                            if 'output_2s.mp4' in filename or 'output_raw.mp4' in filename:
+                                continue
+                            
                             local_path = os.path.join(pod_storage_dir, filename)
                             
                             # Download file from pod
@@ -1695,17 +1710,42 @@ Browse and download generated content from your GPU pod. This includes videos, l
                                 print(f"Failed to download {filename}: {e}")
                                 continue
                         
-                        status = f"✅ Downloaded {downloaded_count} files from pod ({len(video_paths)} videos, {len(image_paths)} images)\n\n💡 Click on any file to view, use the download button (⬇️) to save to your preferred location."
-                        return video_paths, image_paths, status
+                        status = f"✅ Downloaded {downloaded_count} files from pod ({len(video_paths)} videos, {len(image_paths)} images)\n\n💡 Click any thumbnail to preview. Use download button (⬇️) on preview to save permanently."
+                        return video_paths, image_paths, None, None, status
                         
                     except Exception as e:
                         import traceback
                         error_details = traceback.format_exc()
-                        return [], [], f"❌ Error downloading from pod storage: {str(e)}\n\n{error_details}"
+                        return [], [], None, None, f"❌ Error downloading from pod storage: {str(e)}\n\n{error_details}"
+                
+                def select_video_from_gallery(evt: gr.SelectData, gallery_data):
+                    """Show selected video in preview player."""
+                    if gallery_data and evt.index < len(gallery_data):
+                        return gallery_data[evt.index]['name']
+                    return None
+                
+                def select_image_from_gallery(evt: gr.SelectData, gallery_data):
+                    """Show selected image in preview."""
+                    if gallery_data and evt.index < len(gallery_data):
+                        return gallery_data[evt.index]['name']
+                    return None
                 
                 refresh_btn.click(
                     fn=refresh_pod_storage,
-                    outputs=[video_gallery, image_gallery, outputs_status]
+                    outputs=[video_gallery, image_gallery, video_preview, image_preview, outputs_status]
+                )
+                
+                # Handle gallery selection for preview
+                video_gallery.select(
+                    fn=select_video_from_gallery,
+                    inputs=[video_gallery],
+                    outputs=[video_preview]
+                )
+                
+                image_gallery.select(
+                    fn=select_image_from_gallery,
+                    inputs=[image_gallery],
+                    outputs=[image_preview]
                 )
             
             # ===== HELP TAB =====
