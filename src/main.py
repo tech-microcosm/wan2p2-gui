@@ -1396,6 +1396,7 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                             value=False,
                             visible=False
                         )
+                        time_estimate = gr.Markdown("", visible=False)
                         
                         with gr.Row():
                             generate_btn = gr.Button(
