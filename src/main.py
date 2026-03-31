@@ -1865,7 +1865,6 @@ def main():
         inbrowser=False,  # Don't open browser - we have desktop window
         share=False,
         theme=gr.themes.Soft(),
-        show_api=False,  # Disable API docs
         css="""
             .status-box { min-height: 200px; }
             .video-output { min-height: 400px; }
