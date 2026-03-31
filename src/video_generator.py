@@ -1011,8 +1011,15 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
             current, total = step_match.groups()
             pct = (int(current) / int(total)) * 100
             progress_callback(f"   Generation: Step {current}/{total} ({pct:.0f}%)")
+            # Add completion message when reaching 100%
+            if pct >= 100:
+                progress_callback(f"   ✅ Generation complete! Saving video...")
         elif pct_match:
-            progress_callback(f"   Progress: {pct_match.group(1)}%")
+            pct_value = int(pct_match.group(1))
+            progress_callback(f"   Progress: {pct_value}%")
+            # Add completion message when reaching 100%
+            if pct_value >= 100:
+                progress_callback(f"   ✅ Generation complete! Saving video...")
         elif 'loading' in line.lower():
             progress_callback(f"   {line}")
         elif 'error' in line.lower() or 'failed' in line.lower():

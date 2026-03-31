@@ -895,6 +895,7 @@ def generate_video_wrapper(
     rife_multiplier: int,
     sample_steps: int = 20,
     enable_tiling: bool = False,
+    save_last_frame: bool = False,
     input_image: Optional[str] = None,
     input_audio: Optional[str] = None
 ) -> Generator[Tuple[Optional[str], str], None, None]:
@@ -982,6 +983,29 @@ def generate_video_wrapper(
         
         if video_path:
             final_status += f"\n\n✅ Video ready! Use the download button (⬇️) above to save it to your preferred location."
+            
+            # Extract last frame if requested (for I2V workflow)
+            if save_last_frame:
+                try:
+                    import subprocess
+                    frame_path = video_path.replace('.mp4', '_last_frame.png')
+                    
+                    progress_callback(f"\n📸 Extracting last frame...")
+                    
+                    # Use ffmpeg to extract last frame
+                    cmd = [
+                        'ffmpeg', '-sseof', '-0.1', '-i', video_path,
+                        '-update', '1', '-q:v', '2', '-frames:v', '1', frame_path, '-y'
+                    ]
+                    subprocess.run(cmd, capture_output=True, timeout=30, check=False)
+                    
+                    if os.path.exists(frame_path):
+                        final_status += f"\n📸 Last frame saved: {os.path.basename(frame_path)}"
+                        progress_callback(f"   Saved to: {frame_path}")
+                    else:
+                        final_status += f"\n⚠️ Failed to extract last frame"
+                except Exception as e:
+                    final_status += f"\n⚠️ Frame extraction failed: {str(e)}"
         
         # Save to history
         try:
@@ -1398,6 +1422,12 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                         )
                         time_estimate = gr.Markdown("", visible=False)
                         
+                        save_last_frame_checkbox = gr.Checkbox(
+                            label="📸 Save Last Frame as Image",
+                            value=False,
+                            info="Saves the final frame for use with I2V model (concatenate videos)"
+                        )
+                        
                         with gr.Row():
                             generate_btn = gr.Button(
                                 "🚀 Generate",
@@ -1486,7 +1516,7 @@ Example: `213.173.107.13:22324` → IP: `213.173.107.13`, Port: `22324`
                 
                 generate_btn.click(
                     fn=generate_video_wrapper,
-                    inputs=[prompt, duration, model, resolution, seed, enhance_prompt, rife_multiplier, sample_steps, enable_tiling, input_image, input_audio],
+                    inputs=[prompt, duration, model, resolution, seed, enhance_prompt, rife_multiplier, sample_steps, enable_tiling, save_last_frame_checkbox, input_image, input_audio],
                     outputs=[output_video, generation_status]
                 )
                 
