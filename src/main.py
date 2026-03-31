@@ -1847,6 +1847,13 @@ All models tested with **RunPod PyTorch 2.8.0** template, **250GB container disk
 
 def main():
     """Main entry point."""
+    # Fix uvicorn logging in PyInstaller frozen builds
+    import logging
+    if getattr(sys, 'frozen', False):
+        # Disable uvicorn's access log in frozen builds to avoid isatty() errors
+        logging.getLogger("uvicorn.access").disabled = True
+        logging.getLogger("uvicorn.error").disabled = True
+    
     app = create_ui()
     app.launch(
         server_name="127.0.0.1",
@@ -1854,6 +1861,7 @@ def main():
         inbrowser=False,  # Don't open browser - we have desktop window
         share=False,
         theme=gr.themes.Soft(),
+        show_api=False,  # Disable API docs
         css="""
             .status-box { min-height: 200px; }
             .video-output { min-height: 400px; }
