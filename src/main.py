@@ -1033,22 +1033,24 @@ You can stop this generation and try again with a smaller model or higher specs 
                 try:
                     progress_callback(f"\n📸 Extracting last frame on pod...")
                     
-                    # Determine correct remote video path based on duration
+                    # Find the most recent timestamped video file for this duration
                     if int(duration) == 10:
-                        remote_video = "/root/Wan2.2/video_10s.mp4"
+                        find_cmd = "ls -t /root/Wan2.2/video_10s_*.mp4 2>/dev/null | head -1"
                     else:
-                        remote_video = f"/root/Wan2.2/output_{int(duration)}s.mp4"
+                        find_cmd = f"ls -t /root/Wan2.2/output_{int(duration)}s_*.mp4 2>/dev/null | head -1"
                     
-                    remote_frame = f"/root/Wan2.2/last_frame_{int(duration)}s.png"
+                    exit_code, stdout, _ = app_state.ssh_manager.execute_command(find_cmd, timeout=5)
                     
-                    # Check if video exists first
-                    check_cmd = f"test -f {remote_video} && echo 'exists'"
-                    exit_code, stdout, _ = app_state.ssh_manager.execute_command(check_cmd, timeout=5)
-                    
-                    if 'exists' not in stdout:
-                        progress_callback(f"   ⚠️ Video not found on pod: {remote_video}")
+                    if exit_code != 0 or not stdout.strip():
+                        progress_callback(f"   ⚠️ Video not found on pod")
                         final_status += f"\n⚠️ Could not find video on pod for frame extraction"
                     else:
+                        remote_video = stdout.strip()
+                        # Generate timestamp for frame filename
+                        import time
+                        timestamp = int(time.time())
+                        remote_frame = f"/root/Wan2.2/last_frame_{int(duration)}s_{timestamp}.png"
+                        
                         extract_cmd = f"ffmpeg -sseof -0.1 -i {remote_video} -update 1 -q:v 2 -frames:v 1 {remote_frame} -y 2>/dev/null"
                         exit_code, stdout, stderr = app_state.ssh_manager.execute_command(extract_cmd, timeout=30)
                         
@@ -1665,10 +1667,10 @@ Browse and download generated content from your GPU pod. This includes videos, l
                         return [], [], None, None, "❌ Not connected to pod. Please connect first."
                     
                     try:
-                        # List files - only show final videos (5s, 10s), exclude intermediate (2s, raw)
+                        # List files - only show final videos (5s, 10s) with timestamps, exclude intermediate (2s, raw)
                         # Use find to avoid duplicates and only list files that exist
                         exit_code, stdout, stderr = app_state.ssh_manager.execute_command(
-                            "cd /root/Wan2.2 && find . -maxdepth 1 \\( -name 'output_5s.mp4' -o -name 'output_10s.mp4' -o -name 'video_10s.mp4' -o -name 'last_frame*.png' \\) -type f 2>/dev/null | sed 's|^\\./|/root/Wan2.2/|' | sort -r",
+                            "cd /root/Wan2.2 && find . -maxdepth 1 \\( -name 'output_5s_*.mp4' -o -name 'output_10s_*.mp4' -o -name 'video_10s_*.mp4' -o -name 'last_frame*.png' \\) -type f 2>/dev/null | sed 's|^\\./|/root/Wan2.2/|' | sort -r",
                             timeout=10
                         )
                         

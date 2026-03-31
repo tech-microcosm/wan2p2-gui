@@ -666,7 +666,10 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             self._cleanup_memory(progress_callback)
         
         # Run RIFE interpolation only if configured for this duration
-        output_file = f"/root/Wan2.2/output_{duration}s.mp4"
+        # Add timestamp to prevent overwriting previous videos
+        import time
+        timestamp = int(time.time())
+        output_file = f"/root/Wan2.2/output_{duration}s_{timestamp}.mp4"
         
         if config.get('use_rife', False):
             if progress_callback:
@@ -695,7 +698,7 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
         if progress_callback:
             progress_callback(f"\n📥 Downloading video from pod...")
         
-        if not self.ssh.download_file(f"/root/Wan2.2/output_{duration}s.mp4", local_path):
+        if not self.ssh.download_file(output_file, local_path):
             return None, "❌ Failed to download video"
         
         if progress_callback:
@@ -876,11 +879,15 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
         if progress_callback:
             progress_callback(f"\n🔗 Stitching segments together...")
         
-        stitch_cmd = """cd /root/Wan2.2 && cat > filelist.txt << 'EOF'
+        # Add timestamp to prevent overwriting previous videos
+        import time
+        timestamp = int(time.time())
+        
+        stitch_cmd = f"""cd /root/Wan2.2 && cat > filelist.txt << 'EOF'
 file 'segment1_interp.mp4'
 file 'segment2_interp.mp4'
 EOF
-ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
+ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s_{timestamp}.mp4"""
         
         exit_code, _, stderr = self.ssh.execute_command(stitch_cmd)
         
@@ -893,7 +900,7 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
         if progress_callback:
             progress_callback(f"\n📥 Downloading 10s video from pod...")
         
-        if not self.ssh.download_file("/root/Wan2.2/video_10s.mp4", local_path):
+        if not self.ssh.download_file(f"/root/Wan2.2/video_10s_{timestamp}.mp4", local_path):
             return None, "❌ Failed to download video"
         
         if progress_callback:
