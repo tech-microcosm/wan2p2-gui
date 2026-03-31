@@ -1666,6 +1666,10 @@ Browse and download generated content from your GPU pod. This includes videos, l
                         return [], [], None, None, "❌ Not connected to pod. Please connect first."
                     
                     try:
+                        # First, list ALL files in Wan2.2 directory for debugging
+                        debug_cmd = "ls -lh /root/Wan2.2/*.mp4 /root/Wan2.2/*.png 2>/dev/null"
+                        debug_exit, debug_stdout, _ = app_state.ssh_manager.execute_command(debug_cmd, timeout=10)
+                        
                         # List files - only show final videos (5s, 10s) with timestamps, exclude intermediate (2s, raw)
                         # Use find to avoid duplicates and only list files that exist
                         exit_code, stdout, stderr = app_state.ssh_manager.execute_command(
@@ -1674,7 +1678,8 @@ Browse and download generated content from your GPU pod. This includes videos, l
                         )
                         
                         if exit_code != 0 or not stdout.strip():
-                            return [], [], None, None, f"⚠️ No files found in pod storage"
+                            debug_info = f"\n\nDebug - All files on pod:\n{debug_stdout}" if debug_stdout else ""
+                            return [], [], None, None, f"⚠️ No matching files found in pod storage{debug_info}"
                         
                         # Parse file list and download to local temp
                         import tempfile
