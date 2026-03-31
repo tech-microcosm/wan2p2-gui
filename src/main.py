@@ -1666,8 +1666,9 @@ Browse and download generated content from your GPU pod. This includes videos, l
                     
                     try:
                         # List files - only show final videos (5s, 10s), exclude intermediate (2s, raw)
+                        # Use find to avoid duplicates and only list files that exist
                         exit_code, stdout, stderr = app_state.ssh_manager.execute_command(
-                            "ls -1 /root/Wan2.2/output_5s.mp4 /root/Wan2.2/output_10s.mp4 /root/Wan2.2/video_10s.mp4 /root/Wan2.2/*.png /root/Wan2.2/last_frame*.png 2>/dev/null | tail -30",
+                            "cd /root/Wan2.2 && find . -maxdepth 1 \\( -name 'output_5s.mp4' -o -name 'output_10s.mp4' -o -name 'video_10s.mp4' -o -name 'last_frame*.png' \\) -type f 2>/dev/null | sed 's|^\\./|/root/Wan2.2/|' | sort -r",
                             timeout=10
                         )
                         
@@ -1721,13 +1722,21 @@ Browse and download generated content from your GPU pod. This includes videos, l
                 def select_video_from_gallery(evt: gr.SelectData, gallery_data):
                     """Show selected video in preview player."""
                     if gallery_data and evt.index < len(gallery_data):
-                        return gallery_data[evt.index]['name']
+                        item = gallery_data[evt.index]
+                        # Gallery data can be a path string or tuple (path, caption)
+                        if isinstance(item, tuple):
+                            return item[0]
+                        return item
                     return None
                 
                 def select_image_from_gallery(evt: gr.SelectData, gallery_data):
                     """Show selected image in preview."""
                     if gallery_data and evt.index < len(gallery_data):
-                        return gallery_data[evt.index]['name']
+                        item = gallery_data[evt.index]
+                        # Gallery data can be a path string or tuple (path, caption)
+                        if isinstance(item, tuple):
+                            return item[0]
+                        return item
                     return None
                 
                 refresh_btn.click(
