@@ -1,11 +1,12 @@
 """Version checking and auto-update functionality."""
 
+import sys
 import requests
 from packaging import version
 from typing import Optional, Tuple
 
 # Current app version - update this with each release
-CURRENT_VERSION = "0.1.3"
+CURRENT_VERSION = "1.1.0"
 
 def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
     """
@@ -14,6 +15,10 @@ def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
     Returns:
         Tuple of (update_available, latest_version, download_url)
     """
+    # Skip version check when running from source (not frozen)
+    if not getattr(sys, 'frozen', False):
+        return False, None, None
+    
     try:
         # Check GitHub releases API
         api_url = "https://api.github.com/repos/tech-microcosm/wan2p2-gui/releases/latest"

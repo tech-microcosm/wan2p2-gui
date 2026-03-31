@@ -1712,14 +1712,23 @@ Browse and download generated content from your GPU pod. This includes videos, l
                             try:
                                 success = app_state.ssh_manager.download_file(remote_path, local_path)
                                 if success and os.path.exists(local_path):
-                                    if filename.endswith('.mp4'):
-                                        video_paths.append(local_path)
-                                    elif filename.endswith('.png'):
-                                        image_paths.append(local_path)
-                                    downloaded_count += 1
+                                    # Verify file has content (not empty)
+                                    file_size = os.path.getsize(local_path)
+                                    if file_size > 0:
+                                        if filename.endswith('.mp4'):
+                                            video_paths.append(local_path)
+                                        elif filename.endswith('.png'):
+                                            image_paths.append(local_path)
+                                        downloaded_count += 1
+                                    else:
+                                        print(f"Skipping empty file: {filename}")
                             except Exception as e:
                                 print(f"Failed to download {filename}: {e}")
                                 continue
+                        
+                        # Filter out any None or empty values
+                        video_paths = [p for p in video_paths if p and os.path.exists(p) and os.path.getsize(p) > 0]
+                        image_paths = [p for p in image_paths if p and os.path.exists(p) and os.path.getsize(p) > 0]
                         
                         status = f"✅ Downloaded {downloaded_count} files from pod ({len(video_paths)} videos, {len(image_paths)} images)\n\n💡 Click any thumbnail to preview. Use download button (⬇️) on preview to save permanently."
                         return video_paths, image_paths, None, None, status
