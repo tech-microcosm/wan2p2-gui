@@ -60,7 +60,7 @@ jobs:
         run: npm run build
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux-builds
           path: src-tauri/target/release/bundle/deb/*.deb
@@ -126,7 +126,7 @@ jobs:
         run: npm run build
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-builds
           path: src-tauri/target/release/bundle/msi/*.msi
@@ -185,7 +185,7 @@ jobs:
         run: npm run build
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macos-builds
           path: src-tauri/target/release/bundle/dmg/*.dmg
