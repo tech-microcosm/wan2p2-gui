@@ -690,17 +690,12 @@ print(f'Saved image: {{img_verify.size[0]}}x{{img_verify.size[1]}}')
             self.ssh.execute_command(mv_cmd)
         
         # Download video
-        if progress_callback:
-            progress_callback(f"\n⬇️ Downloading video...")
-        
         local_path = os.path.join(tempfile.gettempdir(), f"wan2_video_{duration}s_{seed}.mp4")
         
-        def download_progress(filename, received, total):
-            if progress_callback and total > 0:
-                pct = (received / total) * 100
-                progress_callback(f"   Download: {pct:.1f}% ({received // 1024 // 1024}MB / {total // 1024 // 1024}MB)")
+        if progress_callback:
+            progress_callback(f"\n📥 Downloading video from pod...")
         
-        if not self.ssh.download_file(f"/root/Wan2.2/output_{duration}s.mp4", local_path, download_progress):
+        if not self.ssh.download_file(f"/root/Wan2.2/output_{duration}s.mp4", local_path):
             return None, "❌ Failed to download video"
         
         if progress_callback:
@@ -893,17 +888,12 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
             return None, f"❌ Video stitching failed: {stderr[:500]}"
         
         # Download final video
-        if progress_callback:
-            progress_callback(f"\n⬇️ Downloading video...")
-        
         local_path = os.path.join(tempfile.gettempdir(), f"wan2_video_10s_{seed}.mp4")
         
-        def download_progress(filename, received, total):
-            if progress_callback and total > 0:
-                pct = (received / total) * 100
-                progress_callback(f"   Download: {pct:.1f}%")
+        if progress_callback:
+            progress_callback(f"\n📥 Downloading 10s video from pod...")
         
-        if not self.ssh.download_file("/root/Wan2.2/video_10s.mp4", local_path, download_progress):
+        if not self.ssh.download_file("/root/Wan2.2/video_10s.mp4", local_path):
             return None, "❌ Failed to download video"
         
         if progress_callback:
@@ -1011,15 +1001,9 @@ ffmpeg -y -f concat -safe 0 -i filelist.txt -c copy video_10s.mp4"""
             current, total = step_match.groups()
             pct = (int(current) / int(total)) * 100
             progress_callback(f"   Generation: Step {current}/{total} ({pct:.0f}%)")
-            # Add completion message when reaching 100%
-            if pct >= 100:
-                progress_callback(f"   ✅ Generation complete! Saving video...")
         elif pct_match:
             pct_value = int(pct_match.group(1))
             progress_callback(f"   Progress: {pct_value}%")
-            # Add completion message when reaching 100%
-            if pct_value >= 100:
-                progress_callback(f"   ✅ Generation complete! Saving video...")
         elif 'loading' in line.lower():
             progress_callback(f"   {line}")
         elif 'error' in line.lower() or 'failed' in line.lower():

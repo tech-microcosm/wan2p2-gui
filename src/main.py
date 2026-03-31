@@ -1033,26 +1033,38 @@ You can stop this generation and try again with a smaller model or higher specs 
                 try:
                     progress_callback(f"\n📸 Extracting last frame on pod...")
                     
-                    # Extract frame on pod using ffmpeg (which is available there)
-                    remote_video = f"/root/Wan2.2/{os.path.basename(video_path)}"
-                    remote_frame = remote_video.replace('.mp4', '_last_frame.png')
-                    
-                    extract_cmd = f"ffmpeg -sseof -0.1 -i {remote_video} -update 1 -q:v 2 -frames:v 1 {remote_frame} -y 2>/dev/null"
-                    exit_code, stdout, stderr = app_state.ssh_manager.execute_command(extract_cmd, timeout=30)
-                    
-                    if exit_code == 0:
-                        # Download the frame to local temp
-                        import tempfile
-                        local_frame = os.path.join(tempfile.gettempdir(), os.path.basename(remote_frame))
-                        
-                        if app_state.ssh_manager.download_file(remote_frame, local_frame):
-                            final_status += f"\n📸 Last frame saved! Find it in Pod Storage tab or download here."
-                            progress_callback(f"   ✅ Frame extracted: {os.path.basename(remote_frame)}")
-                        else:
-                            final_status += f"\n⚠️ Frame extracted on pod but download failed. Use Pod Storage to download."
+                    # Determine correct remote video path based on duration
+                    if int(duration) == 10:
+                        remote_video = "/root/Wan2.2/video_10s.mp4"
                     else:
-                        final_status += f"\n⚠️ Failed to extract last frame on pod"
-                        progress_callback(f"   Error: {stderr[:100] if stderr else 'Unknown error'}")
+                        remote_video = f"/root/Wan2.2/output_{int(duration)}s.mp4"
+                    
+                    remote_frame = f"/root/Wan2.2/last_frame_{int(duration)}s.png"
+                    
+                    # Check if video exists first
+                    check_cmd = f"test -f {remote_video} && echo 'exists'"
+                    exit_code, stdout, _ = app_state.ssh_manager.execute_command(check_cmd, timeout=5)
+                    
+                    if 'exists' not in stdout:
+                        progress_callback(f"   ⚠️ Video not found on pod: {remote_video}")
+                        final_status += f"\n⚠️ Could not find video on pod for frame extraction"
+                    else:
+                        extract_cmd = f"ffmpeg -sseof -0.1 -i {remote_video} -update 1 -q:v 2 -frames:v 1 {remote_frame} -y 2>/dev/null"
+                        exit_code, stdout, stderr = app_state.ssh_manager.execute_command(extract_cmd, timeout=30)
+                        
+                        if exit_code == 0:
+                            # Download the frame to local temp
+                            import tempfile
+                            local_frame = os.path.join(tempfile.gettempdir(), os.path.basename(remote_frame))
+                            
+                            if app_state.ssh_manager.download_file(remote_frame, local_frame):
+                                final_status += f"\n📸 Last frame saved! Find it in Pod Storage tab."
+                                progress_callback(f"   ✅ Frame extracted: {os.path.basename(remote_frame)}")
+                            else:
+                                final_status += f"\n⚠️ Frame extracted on pod but download failed. Use Pod Storage to download."
+                        else:
+                            final_status += f"\n⚠️ Failed to extract last frame on pod"
+                            progress_callback(f"   Error: {stderr[:100] if stderr else 'Unknown error'}")
                 except Exception as e:
                     final_status += f"\n⚠️ Frame extraction failed: {str(e)}"
         
@@ -1618,20 +1630,22 @@ Browse and download generated content from your GPU pod. This includes videos, l
                         video_gallery = gr.Gallery(
                             label="Generated Videos",
                             columns=4,
-                            height=200,
-                            object_fit="cover",
+                            rows=1,
+                            height=150,
+                            object_fit="contain",
                             allow_preview=True,
-                            preview=True
+                            elem_id="pod-video-gallery"
                         )
                     
                     with gr.Tab("🖼️ Images (Last Frames)"):
                         image_gallery = gr.Gallery(
                             label="Saved Images",
                             columns=5,
-                            height=200,
-                            object_fit="cover",
+                            rows=1,
+                            height=150,
+                            object_fit="contain",
                             allow_preview=True,
-                            preview=True
+                            elem_id="pod-image-gallery"
                         )
                         gr.Markdown("*Images saved with 'Save Last Frame' option can be used as reference for I2V model*")
                 
@@ -1788,6 +1802,10 @@ def main():
         css="""
             .status-box { min-height: 200px; }
             .video-output { min-height: 400px; }
+            #pod-video-gallery .thumbnail-item { max-height: 120px !important; }
+            #pod-video-gallery img, #pod-video-gallery video { max-height: 100px !important; object-fit: contain !important; }
+            #pod-image-gallery .thumbnail-item { max-height: 120px !important; }
+            #pod-image-gallery img { max-height: 100px !important; object-fit: contain !important; }
         """
     )
 
